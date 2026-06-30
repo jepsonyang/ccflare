@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { REFRESH_INTERVALS } from "../constants";
+import { getBasePath } from "../lib/base-path";
 import { queryKeys } from "../lib/query-keys";
 
 interface RequestsCache {
@@ -85,7 +86,7 @@ export function useRequestsPageModel(limit = 200) {
 				reconnectTimeout = null;
 			}
 
-			es = new EventSource("/api/requests/stream");
+			es = new EventSource(`${getBasePath()}/api/requests/stream`);
 
 			es.addEventListener("open", () => {
 				retries = 0;

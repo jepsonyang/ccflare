@@ -215,6 +215,10 @@ Key endpoints:
 - **TUI:** `bun run ccflare`
 - **Server only:** `bun run start`
 
+### Serving the dashboard under a path prefix
+
+Set `dashboard_base_path` (or `DASHBOARD_BASE_PATH`) to mount the dashboard behind a reverse proxy on port 443 without a custom port — e.g. `https://example.com/ccflare/`. The LLM proxy (`/v1/*`) stays at the root and is never exposed under the prefix. See [Configuration → Dashboard Base Path](docs/configuration.md#dashboard-base-path).
+
 ## Requirements
 
 - [Bun](https://bun.sh) >= 1.2.8

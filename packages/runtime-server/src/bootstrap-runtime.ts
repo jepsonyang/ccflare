@@ -1,5 +1,5 @@
 import { APIRouter } from "@ccflare/api";
-import { Config, type RuntimeConfig } from "@ccflare/config";
+import { Config, normalizeBasePath, type RuntimeConfig } from "@ccflare/config";
 import {
 	container,
 	registerDisposable,
@@ -44,6 +44,10 @@ function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 			TIME_CONSTANTS.SESSION_DURATION_DEFAULT,
 		) as number,
 		port,
+		dashboardBasePath: normalizeBasePath(
+			process.env.DASHBOARD_BASE_PATH ??
+				(config.get("dashboard_base_path", "") as string),
+		),
 	};
 }
 

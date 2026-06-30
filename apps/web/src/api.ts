@@ -1,5 +1,5 @@
 import type { AccountResponse } from "@ccflare/api";
-import { HttpClient, HttpError } from "@ccflare/http";
+import { HttpClient, HttpError, type RequestOptions } from "@ccflare/http";
 import type {
 	AccountCreateData,
 	AccountProvider,
@@ -23,6 +23,9 @@ import type {
 } from "@ccflare/types";
 import { isLogEvent, parseLogStreamEvent } from "@ccflare/types";
 import { API_LIMITS, API_TIMEOUT } from "./constants";
+import { getBasePath } from "./lib/base-path";
+
+const BASE = getBasePath();
 
 class API extends HttpClient {
 	constructor() {
@@ -34,6 +37,40 @@ class API extends HttpClient {
 			timeout: API_TIMEOUT,
 			retries: 1,
 		});
+	}
+
+	// Prefix every request path with the dashboard mount base path so the
+	// dashboard works both at the root and behind a path prefix. All concrete
+	// endpoint methods below keep using root-relative paths unchanged.
+	protected getJson<T = unknown>(url: string, options?: RequestOptions) {
+		return super.getJson<T>(`${BASE}${url}`, options);
+	}
+	protected postJson<T = unknown>(
+		url: string,
+		body?: unknown,
+		options?: RequestOptions,
+	) {
+		return super.postJson<T>(`${BASE}${url}`, body, options);
+	}
+	protected putJson<T = unknown>(
+		url: string,
+		body?: unknown,
+		options?: RequestOptions,
+	) {
+		return super.putJson<T>(`${BASE}${url}`, body, options);
+	}
+	protected patchJson<T = unknown>(
+		url: string,
+		body?: unknown,
+		options?: RequestOptions,
+	) {
+		return super.patchJson<T>(`${BASE}${url}`, body, options);
+	}
+	protected deleteJson<T = unknown>(url: string, options?: RequestOptions) {
+		return super.deleteJson<T>(`${BASE}${url}`, options);
+	}
+	protected getText(url: string, options?: RequestOptions) {
+		return super.getText(`${BASE}${url}`, options);
 	}
 
 	async getStats(): Promise<StatsWithAccounts> {
@@ -150,7 +187,7 @@ class API extends HttpClient {
 
 	// SSE streaming requires special handling, keep as-is
 	streamLogs(onLog: (log: LogEvent) => void): EventSource {
-		const eventSource = new EventSource(`/api/logs/stream`);
+		const eventSource = new EventSource(`${BASE}/api/logs/stream`);
 		eventSource.addEventListener("message", (event) => {
 			try {
 				const data = parseLogStreamEvent(JSON.parse(event.data));

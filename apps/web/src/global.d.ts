@@ -4,6 +4,7 @@
 declare global {
 	interface Window {
 		EventSource: typeof EventSource;
+		__ccflareBasePath?: string;
 	}
 }
 

@@ -82,8 +82,35 @@ function serveDashboardFile(
 	});
 }
 
-export function serveDashboardRoute(url: URL): Response | null {
+/**
+ * Serve the SPA shell with the runtime base path injected.
+ *
+ * A `<base href>` makes the build's relative asset references (e.g.
+ * `./chunk-*.js`) resolve under the prefix regardless of route depth, and
+ * `window.__ccflareBasePath` lets the dashboard's API/SSE/router code build
+ * prefixed URLs. When no base path is configured the script still sets an empty
+ * value so the frontend has a single, well-defined source of truth.
+ */
+function serveDashboardShell(basePath: string): Response {
+	const fullPath = resolveDashboardAsset("/index.html");
+	const html = readFileSync(fullPath, "utf8");
+	const inject = `${basePath ? `<base href="${basePath}/">` : ""}<script>window.__ccflareBasePath=${JSON.stringify(basePath)}</script>`;
+	const injected = html.replace("<head>", `<head>${inject}`);
+
+	return new Response(injected, {
+		headers: {
+			"Content-Type": "text/html",
+			"Cache-Control": CACHE.CACHE_CONTROL_NO_CACHE,
+		},
+	});
+}
+
+export function serveDashboardRoute(url: URL, basePath = ""): Response | null {
 	const { manifest } = loadDashboardAssets();
+
+	if (url.pathname === "/index.html") {
+		return serveDashboardShell(basePath);
+	}
 
 	if (manifest[url.pathname]) {
 		return serveDashboardFile(
@@ -94,7 +121,7 @@ export function serveDashboardRoute(url: URL): Response | null {
 	}
 
 	if (!url.pathname.startsWith("/api/") && !url.pathname.startsWith("/v1")) {
-		return serveDashboardFile("/index.html", "text/html");
+		return serveDashboardShell(basePath);
 	}
 
 	return null;

@@ -143,6 +143,7 @@ export default function startServer(
 		apiRouter,
 		proxyContext,
 		withDashboard,
+		basePath: runtimeConfig.dashboardBasePath,
 	});
 
 	// Main server

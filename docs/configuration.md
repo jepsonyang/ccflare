@@ -55,7 +55,8 @@ The configuration file is stored at:
   "retry_delay_ms": 1000,
   "retry_backoff": 2,
   "session_duration_ms": 18000000,
-  "port": 8080
+  "port": 8080,
+  "dashboard_base_path": ""
 }
 ```
 
@@ -72,6 +73,33 @@ The configuration file is stored at:
 | `retry_backoff` | number | `2` | Exponential backoff multiplier for retry delays |
 | `session_duration_ms` | number | `18000000` (5 hours) | Session persistence duration in milliseconds |
 | `port` | number | `8080` | HTTP server port |
+| `dashboard_base_path` | string | `""` | Path prefix the **dashboard** (and its management API/SSE) is mounted under. Empty = served at the root. See [Dashboard Base Path](#dashboard-base-path) |
+
+### Dashboard Base Path
+
+`dashboard_base_path` lets you mount the dashboard under a path prefix so it can be served behind a reverse proxy on port 443 without a custom port (e.g. `https://example.com/ccflare/`). When set:
+
+- The dashboard shell, its static assets, and its management API (`/api/*`, `/health`, `/oauth/*`) are served **only** under the prefix (e.g. `/ccflare/api/stats`).
+- The LLM proxy is **never** reachable under the prefix: `/{prefix}/v1/*` returns `404`. This is enforced in ccflare itself, so it does not depend on a reverse-proxy rule.
+- The proxy (`/v1/*`) continues to be served at the **root** path, unchanged, for local/internal use.
+
+The value is normalized: a leading slash is added and trailing slashes are stripped (`ccflare/` → `/ccflare`); `""` or `"/"` disables the feature.
+
+> ⚠️ This prefix is **not** an authentication mechanism. ccflare endpoints are unauthenticated by design — keep using a reverse proxy (Basic Auth) or network isolation in production. Note that with a prefix configured, root paths like `/health` and `/` are no longer served; use `/{prefix}/health` instead.
+
+Example reverse-proxy (nginx) snippet forwarding `/ccflare/` to ccflare on `127.0.0.1:4011` **without stripping the prefix** (no trailing slash on `proxy_pass`):
+
+```nginx
+location /ccflare/ {
+    proxy_pass http://127.0.0.1:4011;   # keep the /ccflare prefix; ccflare strips it
+    proxy_http_version 1.1;
+    proxy_set_header Host              $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade           $http_upgrade;
+    proxy_set_header Connection        "upgrade";
+    proxy_buffering off;                 # required for live log/request SSE
+}
+```
 
 ### Load Balancing Strategy
 
@@ -102,6 +130,7 @@ The configuration file is stored at:
 | `RETRY_BACKOFF` | `retry_backoff` | number | `RETRY_BACKOFF=1.5` |
 | `SESSION_DURATION_MS` | `session_duration_ms` | number | `SESSION_DURATION_MS=3600000` |
 | `PORT` | `port` | number | `PORT=3000` |
+| `DASHBOARD_BASE_PATH` | `dashboard_base_path` | string | `DASHBOARD_BASE_PATH=/ccflare` |
 | `DATA_RETENTION_DAYS` | `data_retention_days` | number | `DATA_RETENTION_DAYS=7` (payloads) |
 | `REQUEST_RETENTION_DAYS` | `request_retention_days` | number | `REQUEST_RETENTION_DAYS=365` (metadata) |
 | `ccflare_CONFIG_PATH` | - | string | `ccflare_CONFIG_PATH=/etc/ccflare.json` |

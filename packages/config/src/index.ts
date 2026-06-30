@@ -23,6 +23,7 @@ export interface RuntimeConfig {
 	retry: { attempts: number; delayMs: number; backoff: number };
 	sessionDurationMs: number;
 	port: number;
+	dashboardBasePath: string;
 }
 
 export interface ConfigData {
@@ -33,9 +34,33 @@ export interface ConfigData {
 	retry_backoff?: number;
 	session_duration_ms?: number;
 	port?: number;
+	dashboard_base_path?: string;
 	data_retention_days?: number;
 	request_retention_days?: number;
 	[key: string]: string | number | boolean | undefined;
+}
+
+/**
+ * Normalize a dashboard base path into a canonical mount prefix.
+ *
+ * - empty / undefined / "/" → "" (feature disabled, served at root)
+ * - ensures a single leading slash
+ * - strips any trailing slashes
+ *
+ * Examples: "ccflare/" → "/ccflare", "/ccflare" → "/ccflare", "/" → "".
+ */
+export function normalizeBasePath(value: string | undefined): string {
+	if (!value) {
+		return "";
+	}
+	let path = value.trim();
+	if (path === "" || path === "/") {
+		return "";
+	}
+	if (!path.startsWith("/")) {
+		path = `/${path}`;
+	}
+	return path.replace(/\/+$/, "");
 }
 
 function parseNumber(value: string | undefined): number | undefined {
@@ -245,6 +270,7 @@ export class Config extends EventEmitter {
 			},
 			sessionDurationMs: TIME_CONSTANTS.SESSION_DURATION_DEFAULT,
 			port: NETWORK.DEFAULT_PORT,
+			dashboardBasePath: "",
 		};
 
 		// Override with environment variables if present
@@ -271,6 +297,11 @@ export class Config extends EventEmitter {
 		if (port !== undefined) {
 			defaults.port = port;
 		}
+		if (process.env.DASHBOARD_BASE_PATH !== undefined) {
+			defaults.dashboardBasePath = normalizeBasePath(
+				process.env.DASHBOARD_BASE_PATH,
+			);
+		}
 
 		// Override with config file settings if present
 		if (this.data.client_id) {
@@ -290,6 +321,11 @@ export class Config extends EventEmitter {
 		}
 		if (typeof this.data.port === "number") {
 			defaults.port = this.data.port;
+		}
+		if (typeof this.data.dashboard_base_path === "string") {
+			defaults.dashboardBasePath = normalizeBasePath(
+				this.data.dashboard_base_path,
+			);
 		}
 
 		return defaults;
