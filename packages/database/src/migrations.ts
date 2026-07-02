@@ -259,7 +259,14 @@ function migrateAccountsTable(db: Database, columns: TableInfoRow[]): void {
 			paused INTEGER DEFAULT 0,
 			rate_limit_reset INTEGER,
 			rate_limit_status TEXT,
-			rate_limit_remaining INTEGER
+			rate_limit_remaining INTEGER,
+			unified_5h_utilization REAL,
+			unified_5h_reset INTEGER,
+			unified_7d_utilization REAL,
+			unified_7d_reset INTEGER,
+			unified_fable_utilization REAL,
+			unified_fable_reset INTEGER,
+			unified_representative_claim TEXT
 		)
 	`);
 
@@ -393,6 +400,25 @@ function migrateRequestsTable(db: Database, columns: TableInfoRow[]): void {
 	log.info("Migrated requests table to v2 schema");
 }
 
+function ensureAccountRateLimitWindowColumns(db: Database): void {
+	const columns = getTableInfo(db, "accounts");
+	const newColumns = [
+		["unified_5h_utilization", "REAL"],
+		["unified_5h_reset", "INTEGER"],
+		["unified_7d_utilization", "REAL"],
+		["unified_7d_reset", "INTEGER"],
+		["unified_fable_utilization", "REAL"],
+		["unified_fable_reset", "INTEGER"],
+		["unified_representative_claim", "TEXT"],
+	] as const;
+
+	for (const [columnName, columnType] of newColumns) {
+		if (!hasColumn(columns, columnName)) {
+			db.run(`ALTER TABLE accounts ADD COLUMN ${columnName} ${columnType}`);
+		}
+	}
+}
+
 function ensureAuthSessionsTable(db: Database): void {
 	db.run(`
 		CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -502,7 +528,14 @@ export function ensureSchema(db: Database): void {
 			paused INTEGER DEFAULT 0,
 			rate_limit_reset INTEGER,
 			rate_limit_status TEXT,
-			rate_limit_remaining INTEGER
+			rate_limit_remaining INTEGER,
+			unified_5h_utilization REAL,
+			unified_5h_reset INTEGER,
+			unified_7d_utilization REAL,
+			unified_7d_reset INTEGER,
+			unified_fable_utilization REAL,
+			unified_fable_reset INTEGER,
+			unified_representative_claim TEXT
 		)
 	`);
 	ensureAccountsNameUniqueness(db);
@@ -582,6 +615,7 @@ export function runMigrations(db: Database): void {
 	db.run("DROP INDEX IF EXISTS idx_oauth_sessions_expires");
 	ensureAuthSessionsTable(db);
 	ensureAccountsNameUniqueness(db);
+	ensureAccountRateLimitWindowColumns(db);
 
 	// Add performance indexes
 	db.run(

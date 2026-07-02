@@ -11,6 +11,15 @@ export interface RateLimitInfo {
 	resetTime?: number;
 	statusHeader?: string;
 	remaining?: number;
+	// Unified rate-limit utilization windows (Anthropic OAuth accounts).
+	// Utilization values are normalized to 0-100; reset times are ms epoch.
+	fiveHourUtilization?: number;
+	fiveHourResetTime?: number;
+	sevenDayUtilization?: number;
+	sevenDayResetTime?: number;
+	fableUtilization?: number;
+	fableResetTime?: number;
+	representativeClaim?: string;
 }
 
 export interface Provider {

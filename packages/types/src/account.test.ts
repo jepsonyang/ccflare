@@ -3,6 +3,7 @@ import {
 	type Account,
 	getAccountRateLimitInfo,
 	getAccountSessionInfo,
+	getAccountUsageWindows,
 } from "./account";
 import { ACCOUNT_PROVIDERS } from "./provider-metadata";
 
@@ -40,6 +41,13 @@ describe("toAccount", () => {
 			rate_limit_reset: now + 180_000,
 			rate_limit_status: "allowed_warning",
 			rate_limit_remaining: 2,
+			unified_5h_utilization: 42,
+			unified_5h_reset: now + 180_000,
+			unified_7d_utilization: 85,
+			unified_7d_reset: now + 500_000,
+			unified_fable_utilization: 0,
+			unified_fable_reset: now + 300_000,
+			unified_representative_claim: "7d",
 		};
 
 		expect(getAccountRateLimitInfo(account, now)).toEqual({
@@ -53,6 +61,23 @@ describe("toAccount", () => {
 			active: true,
 			startedAt: now - 60_000,
 			requestCount: 4,
+		});
+		expect(getAccountUsageWindows(account)).toEqual({
+			fiveHour: {
+				utilization: 42,
+				resetAt: now + 180_000,
+				isRepresentative: false,
+			},
+			sevenDay: {
+				utilization: 85,
+				resetAt: now + 500_000,
+				isRepresentative: true,
+			},
+			fable: {
+				utilization: 0,
+				resetAt: now + 300_000,
+				isRepresentative: false,
+			},
 		});
 	});
 });

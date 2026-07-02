@@ -22,6 +22,13 @@ export interface AccountRow {
 	rate_limit_reset?: number | null;
 	rate_limit_status?: string | null;
 	rate_limit_remaining?: number | null;
+	unified_5h_utilization?: number | null;
+	unified_5h_reset?: number | null;
+	unified_7d_utilization?: number | null;
+	unified_7d_reset?: number | null;
+	unified_fable_utilization?: number | null;
+	unified_fable_reset?: number | null;
+	unified_representative_claim?: string | null;
 }
 
 export function toAccount(row: AccountRow): Account {
@@ -47,5 +54,12 @@ export function toAccount(row: AccountRow): Account {
 		rate_limit_reset: row.rate_limit_reset ?? null,
 		rate_limit_status: row.rate_limit_status ?? null,
 		rate_limit_remaining: row.rate_limit_remaining ?? null,
+		unified_5h_utilization: row.unified_5h_utilization ?? null,
+		unified_5h_reset: row.unified_5h_reset ?? null,
+		unified_7d_utilization: row.unified_7d_utilization ?? null,
+		unified_7d_reset: row.unified_7d_reset ?? null,
+		unified_fable_utilization: row.unified_fable_utilization ?? null,
+		unified_fable_reset: row.unified_fable_reset ?? null,
+		unified_representative_claim: row.unified_representative_claim ?? null,
 	};
 }

@@ -169,8 +169,23 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		status: string,
 		reset: number | null,
 		remaining?: number | null,
+		windows?: {
+			fiveHourUtilization?: number;
+			fiveHourResetTime?: number;
+			sevenDayUtilization?: number;
+			sevenDayResetTime?: number;
+			fableUtilization?: number;
+			fableResetTime?: number;
+			representativeClaim?: string;
+		},
 	): void {
-		this.accounts.updateRateLimitMeta(accountId, status, reset, remaining);
+		this.accounts.updateRateLimitMeta(
+			accountId,
+			status,
+			reset,
+			remaining,
+			windows,
+		);
 	}
 
 	pauseAccount(accountId: string): void {

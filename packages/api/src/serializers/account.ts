@@ -3,6 +3,7 @@ import {
 	getAccountRateLimitInfo,
 	getAccountSessionInfo,
 	getAccountTokenStatus,
+	getAccountUsageWindows,
 } from "@ccflare/types";
 import type { AccountResponse } from "../types";
 
@@ -12,6 +13,7 @@ export function serializeAccount(
 ): AccountResponse {
 	const rateLimit = getAccountRateLimitInfo(account, now);
 	const session = getAccountSessionInfo(account);
+	const usage = getAccountUsageWindows(account);
 
 	return {
 		id: account.id,
@@ -40,6 +42,29 @@ export function serializeAccount(
 			? new Date(rateLimit.resetAt).toISOString()
 			: null,
 		rateLimitRemaining: rateLimit.remaining,
+		usageWindows: {
+			fiveHour: {
+				utilization: usage.fiveHour.utilization,
+				resetAt: usage.fiveHour.resetAt
+					? new Date(usage.fiveHour.resetAt).toISOString()
+					: null,
+				isRepresentative: usage.fiveHour.isRepresentative,
+			},
+			sevenDay: {
+				utilization: usage.sevenDay.utilization,
+				resetAt: usage.sevenDay.resetAt
+					? new Date(usage.sevenDay.resetAt).toISOString()
+					: null,
+				isRepresentative: usage.sevenDay.isRepresentative,
+			},
+			fable: {
+				utilization: usage.fable.utilization,
+				resetAt: usage.fable.resetAt
+					? new Date(usage.fable.resetAt).toISOString()
+					: null,
+				isRepresentative: usage.fable.isRepresentative,
+			},
+		},
 		sessionInfo: {
 			active: session.active,
 			startedAt: session.startedAt

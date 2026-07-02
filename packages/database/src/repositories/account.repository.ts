@@ -25,7 +25,10 @@ const accountSelectFields = `
 	rate_limited_until, session_start, session_request_count,
 	COALESCE(weight, 1) as weight,
 	COALESCE(paused, 0) as paused,
-	rate_limit_reset, rate_limit_status, rate_limit_remaining
+	rate_limit_reset, rate_limit_status, rate_limit_remaining,
+	unified_5h_utilization, unified_5h_reset, unified_7d_utilization,
+	unified_7d_reset, unified_fable_utilization, unified_fable_reset,
+	unified_representative_claim
 `;
 
 export class AccountRepository extends BaseRepository<Account> {
@@ -277,10 +280,42 @@ export class AccountRepository extends BaseRepository<Account> {
 		status: string,
 		reset: number | null,
 		remaining?: number | null,
+		windows?: {
+			fiveHourUtilization?: number;
+			fiveHourResetTime?: number;
+			sevenDayUtilization?: number;
+			sevenDayResetTime?: number;
+			fableUtilization?: number;
+			fableResetTime?: number;
+			representativeClaim?: string;
+		},
 	): void {
 		this.run(
-			`UPDATE accounts SET rate_limit_status = ?, rate_limit_reset = ?, rate_limit_remaining = ? WHERE id = ?`,
-			[status, reset, remaining ?? null, accountId],
+			`UPDATE accounts SET
+				rate_limit_status = ?,
+				rate_limit_reset = ?,
+				rate_limit_remaining = ?,
+				unified_5h_utilization = COALESCE(?, unified_5h_utilization),
+				unified_5h_reset = COALESCE(?, unified_5h_reset),
+				unified_7d_utilization = COALESCE(?, unified_7d_utilization),
+				unified_7d_reset = COALESCE(?, unified_7d_reset),
+				unified_fable_utilization = COALESCE(?, unified_fable_utilization),
+				unified_fable_reset = COALESCE(?, unified_fable_reset),
+				unified_representative_claim = COALESCE(?, unified_representative_claim)
+			WHERE id = ?`,
+			[
+				status,
+				reset,
+				remaining ?? null,
+				windows?.fiveHourUtilization ?? null,
+				windows?.fiveHourResetTime ?? null,
+				windows?.sevenDayUtilization ?? null,
+				windows?.sevenDayResetTime ?? null,
+				windows?.fableUtilization ?? null,
+				windows?.fableResetTime ?? null,
+				windows?.representativeClaim ?? null,
+				accountId,
+			],
 		);
 	}
 

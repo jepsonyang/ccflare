@@ -88,4 +88,64 @@ describe("AnthropicProvider", () => {
 			remaining: 17,
 		});
 	});
+
+	it("parses unified 5h/7d utilization windows", () => {
+		const fiveHourReset = Math.floor((Date.now() + 120_000) / 1000);
+		const sevenDayReset = Math.floor((Date.now() + 500_000) / 1000);
+		const response = new Response("{}", {
+			status: 200,
+			headers: {
+				"anthropic-ratelimit-unified-status": "allowed",
+				// 5h given as 0-100 percentage, 7d given as 0-1 fraction
+				"anthropic-ratelimit-unified-5h-utilization": "42",
+				"anthropic-ratelimit-unified-5h-reset": String(fiveHourReset),
+				"anthropic-ratelimit-unified-7d-utilization": "0.85",
+				"anthropic-ratelimit-unified-7d-reset": String(sevenDayReset),
+				"anthropic-ratelimit-unified-representative-claim": "7d",
+			},
+		});
+
+		const info = provider.parseRateLimit(response);
+		expect(info.fiveHourUtilization).toBe(42);
+		expect(info.fiveHourResetTime).toBe(fiveHourReset * 1000);
+		expect(info.sevenDayUtilization).toBeCloseTo(85);
+		expect(info.sevenDayResetTime).toBe(sevenDayReset * 1000);
+		expect(info.representativeClaim).toBe("7d");
+	});
+
+	it("parses the Fable (7d_oi) window and normalizes -0.0 to 0", () => {
+		const fableReset = Math.floor((Date.now() + 600_000) / 1000);
+		const response = new Response("{}", {
+			status: 200,
+			headers: {
+				"anthropic-ratelimit-unified-status": "allowed",
+				"anthropic-ratelimit-unified-7d_oi-utilization": "-0.0",
+				"anthropic-ratelimit-unified-7d_oi-reset": String(fableReset),
+			},
+		});
+
+		const info = provider.parseRateLimit(response);
+		expect(info.fableUtilization).toBe(0);
+		expect(info.fableResetTime).toBe(fableReset * 1000);
+	});
+
+	it("omits utilization windows when headers are absent", () => {
+		const response = new Response("{}", { status: 200 });
+		const info = provider.parseRateLimit(response);
+		expect(info.fiveHourUtilization).toBeUndefined();
+		expect(info.sevenDayUtilization).toBeUndefined();
+		expect(info.representativeClaim).toBeUndefined();
+	});
+
+	it("tags a plain 429 without unified headers as a backoff", () => {
+		const resetSeconds = Math.floor((Date.now() + 90_000) / 1000);
+		const response = new Response("{}", {
+			status: 429,
+			headers: { "x-ratelimit-reset": String(resetSeconds) },
+		});
+		const info = provider.parseRateLimit(response);
+		expect(info.isRateLimited).toBe(true);
+		expect(info.statusHeader).toBe("backoff");
+		expect(info.resetTime).toBe(resetSeconds * 1000);
+	});
 });

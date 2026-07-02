@@ -48,15 +48,34 @@ export function updateAccountMetadata(
 	rateLimitInfo: RateLimitInfo,
 	ctx: ResolvedProxyContext,
 ): void {
-	// Only update rate limit metadata when we have actual rate limit headers
-	if (rateLimitInfo.statusHeader) {
-		const status = rateLimitInfo.statusHeader;
+	// Utilization windows are returned on normal responses (not just when a
+	// rate-limit status header is present), so persist when we have either.
+	const hasWindows =
+		rateLimitInfo.fiveHourUtilization !== undefined ||
+		rateLimitInfo.sevenDayUtilization !== undefined ||
+		rateLimitInfo.fiveHourResetTime !== undefined ||
+		rateLimitInfo.sevenDayResetTime !== undefined ||
+		rateLimitInfo.fableUtilization !== undefined ||
+		rateLimitInfo.fableResetTime !== undefined ||
+		rateLimitInfo.representativeClaim !== undefined;
+
+	if (rateLimitInfo.statusHeader || hasWindows) {
+		const status = rateLimitInfo.statusHeader ?? "ok";
 		ctx.asyncWriter.enqueue(() =>
 			ctx.dbOps.updateAccountRateLimitMeta(
 				account.id,
 				status,
 				rateLimitInfo.resetTime ?? null,
 				rateLimitInfo.remaining,
+				{
+					fiveHourUtilization: rateLimitInfo.fiveHourUtilization,
+					fiveHourResetTime: rateLimitInfo.fiveHourResetTime,
+					sevenDayUtilization: rateLimitInfo.sevenDayUtilization,
+					sevenDayResetTime: rateLimitInfo.sevenDayResetTime,
+					fableUtilization: rateLimitInfo.fableUtilization,
+					fableResetTime: rateLimitInfo.fableResetTime,
+					representativeClaim: rateLimitInfo.representativeClaim,
+				},
 			),
 		);
 	}

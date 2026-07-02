@@ -7,6 +7,7 @@ import {
 	getAccountRateLimitInfo,
 	getAccountSessionInfo,
 	getAccountTokenStatus,
+	RATE_LIMIT_BACKOFF_STATUS,
 } from "@ccflare/types";
 
 export interface AccountRateLimitStatusView {
@@ -54,6 +55,20 @@ function toTimestamp(value: number | string | null | undefined): number | null {
 	return Number.isNaN(timestamp) ? null : timestamp;
 }
 
+/** Compact h/m/s backoff duration, e.g. "45s", "1m30s", "10h10m10s". */
+function formatBackoffDuration(ms: number): string {
+	const totalSeconds = Math.ceil(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	let out = "";
+	if (hours > 0) out += `${hours}h`;
+	if (hours > 0 || minutes > 0) out += `${minutes}m`;
+	out += `${seconds}s`;
+	return out;
+}
+
 export function formatAccountRateLimitStatus(
 	rateLimit:
 		| AccountRateLimitInfo
@@ -63,7 +78,6 @@ export function formatAccountRateLimitStatus(
 				isLimited: boolean;
 				until?: number | string | null;
 		  },
-	resetAt?: number | string | null,
 	now: number = Date.now(),
 ): string {
 	if (rateLimit.code === "paused") {
@@ -71,19 +85,51 @@ export function formatAccountRateLimitStatus(
 	}
 
 	const untilTs = toTimestamp(rateLimit.until ?? null);
+
+	// Short request-rate backoff (plain 429): show the remaining time, since
+	// it is not reflected in the 5h/7d usage windows below.
+	if (rateLimit.code === RATE_LIMIT_BACKOFF_STATUS) {
+		if (rateLimit.isLimited && untilTs && untilTs > now) {
+			return `backoff (${formatBackoffDuration(untilTs - now)})`;
+		}
+		return "OK";
+	}
+
+	// Quota-window rate limit: the reset time is already shown by the usage
+	// windows below, so keep this to a plain status without a countdown.
 	if (rateLimit.isLimited && untilTs && untilTs > now) {
-		return `Rate limited (${Math.ceil((untilTs - now) / 60000)}m)`;
+		return "Rate limited";
 	}
 
 	if (rateLimit.code !== "ok") {
-		const resetTs = toTimestamp(resetAt);
-		if (resetTs && resetTs > now) {
-			return `${rateLimit.code} (${Math.ceil((resetTs - now) / 60000)}m)`;
-		}
 		return rateLimit.code;
 	}
 
 	return "OK";
+}
+
+export type RateLimitSeverity = "normal" | "warning" | "critical";
+
+/**
+ * Severity bucket for a rate-limit status code, for color coding.
+ * - warning: soft/temporary pressure (soft warning, soft queue, 429 backoff)
+ * - critical: hard limits that block usage
+ * - normal: allowed / ok / anything else
+ */
+export function getAccountRateLimitSeverity(code: string): RateLimitSeverity {
+	switch (code) {
+		case "allowed_warning":
+		case "queueing_soft":
+		case RATE_LIMIT_BACKOFF_STATUS:
+			return "warning";
+		case "rate_limited":
+		case "blocked":
+		case "queueing_hard":
+		case "payment_required":
+			return "critical";
+		default:
+			return "normal";
+	}
 }
 
 export function formatAccountSessionInfo(
@@ -125,11 +171,7 @@ export function toAccountDisplay(
 		requestCount: account.request_count,
 		totalRequests: account.total_requests,
 		tokenStatus: getAccountTokenStatus(account, now),
-		rateLimitStatus: formatAccountRateLimitStatus(
-			rateLimit,
-			rateLimit.resetAt,
-			now,
-		),
+		rateLimitStatus: formatAccountRateLimitStatus(rateLimit, now),
 		sessionInfo: formatAccountSessionInfo(session, now),
 		paused: account.paused,
 		weight: account.weight,

@@ -555,6 +555,23 @@ describe("APIRouter", () => {
 			};
 			rateLimitReset: string | null;
 			rateLimitRemaining: number | null;
+			usageWindows: {
+				fiveHour: {
+					utilization: number | null;
+					resetAt: string | null;
+					isRepresentative: boolean;
+				};
+				sevenDay: {
+					utilization: number | null;
+					resetAt: string | null;
+					isRepresentative: boolean;
+				};
+				fable: {
+					utilization: number | null;
+					resetAt: string | null;
+					isRepresentative: boolean;
+				};
+			};
 			sessionInfo: {
 				active: boolean;
 				startedAt: string | null;
@@ -583,6 +600,23 @@ describe("APIRouter", () => {
 				},
 				rateLimitReset: null,
 				rateLimitRemaining: null,
+				usageWindows: {
+					fiveHour: {
+						utilization: null,
+						resetAt: null,
+						isRepresentative: false,
+					},
+					sevenDay: {
+						utilization: null,
+						resetAt: null,
+						isRepresentative: false,
+					},
+					fable: {
+						utilization: null,
+						resetAt: null,
+						isRepresentative: false,
+					},
+				},
 				sessionInfo: {
 					active: false,
 					startedAt: null,

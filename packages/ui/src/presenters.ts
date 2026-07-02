@@ -8,6 +8,8 @@ import type {
 import {
 	formatAccountRateLimitStatus,
 	formatAccountSessionInfo,
+	getAccountRateLimitSeverity,
+	type RateLimitSeverity,
 } from "./account-display";
 import { formatDuration, formatPercentage, formatTokens } from "./formatters";
 
@@ -57,10 +59,11 @@ export class AccountPresenter {
 	}
 
 	get rateLimitStatus(): string {
-		return formatAccountRateLimitStatus(
-			this.account.rateLimitStatus,
-			this.account.rateLimitReset,
-		);
+		return formatAccountRateLimitStatus(this.account.rateLimitStatus);
+	}
+
+	get rateLimitSeverity(): RateLimitSeverity {
+		return getAccountRateLimitSeverity(this.account.rateLimitStatus.code);
 	}
 
 	get sessionInfo(): string {

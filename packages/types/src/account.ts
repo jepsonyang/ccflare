@@ -1,5 +1,13 @@
 import type { AccountProvider, AuthMethod } from "./provider-metadata";
 
+/**
+ * Synthetic rate-limit status used for a plain HTTP 429 that carries no
+ * unified window headers — i.e. a short-lived request-rate backoff rather
+ * than a 5h/7d quota exhaustion. Stored in `rate_limit_status` so the UI
+ * can show the remaining backoff time instead of a generic "Rate limited".
+ */
+export const RATE_LIMIT_BACKOFF_STATUS = "backoff";
+
 export interface AccountRateLimitInfo {
 	code: string;
 	isLimited: boolean;
@@ -12,6 +20,23 @@ export interface AccountSessionInfo {
 	active: boolean;
 	startedAt: number | null;
 	requestCount: number;
+}
+
+export interface AccountUsageWindow {
+	// Percentage of the window's quota consumed, 0-100. Null until the
+	// account has received a response carrying the utilization headers.
+	utilization: number | null;
+	// Window reset time as ms epoch, or null when unknown.
+	resetAt: number | null;
+	// True when this window is the current binding constraint.
+	isRepresentative: boolean;
+}
+
+export interface AccountUsageWindows {
+	fiveHour: AccountUsageWindow;
+	sevenDay: AccountUsageWindow;
+	// Fable weekly bucket. utilization stays null until Fable is used.
+	fable: AccountUsageWindow;
 }
 
 // Domain model - used throughout the application
@@ -37,6 +62,15 @@ export interface Account {
 	rate_limit_reset: number | null;
 	rate_limit_status: string | null;
 	rate_limit_remaining: number | null;
+	// Unified utilization windows (Anthropic OAuth). Utilization is 0-100,
+	// reset times are ms epoch, claim identifies the binding window.
+	unified_5h_utilization: number | null;
+	unified_5h_reset: number | null;
+	unified_7d_utilization: number | null;
+	unified_7d_reset: number | null;
+	unified_fable_utilization: number | null;
+	unified_fable_reset: number | null;
+	unified_representative_claim: string | null;
 }
 
 // Account creation types
@@ -88,6 +122,58 @@ export function getAccountSessionInfo(account: Account): AccountSessionInfo {
 		active: account.session_start !== null,
 		startedAt: account.session_start ?? null,
 		requestCount: account.session_request_count,
+	};
+}
+
+/**
+ * Whether the representative-claim header refers to a given window.
+ * Observed claim tokens: "five_hour" (5h) and "7d_oi" (Fable); "seven_day"
+ * is inferred for the plain weekly window. Matching stays tolerant on
+ * substrings to survive minor wording changes.
+ */
+function claimMatchesWindow(
+	claim: string | null,
+	window: "5h" | "7d" | "fable",
+): boolean {
+	if (!claim) return false;
+	const c = claim.toLowerCase();
+	if (window === "5h") {
+		return c.includes("5h") || c.includes("hour") || c.includes("session");
+	}
+	if (window === "fable") {
+		// Fable bucket header is "7d_oi"; a binding claim would name it.
+		return c.includes("oi") || c.includes("fable");
+	}
+	// Plain weekly ("All models"); exclude the Fable-specific "7d_oi" claim.
+	if (c.includes("oi") || c.includes("fable")) {
+		return false;
+	}
+	return (
+		c.includes("7d") ||
+		c.includes("day") ||
+		c.includes("week") ||
+		c.includes("weekly")
+	);
+}
+
+export function getAccountUsageWindows(account: Account): AccountUsageWindows {
+	const claim = account.unified_representative_claim;
+	return {
+		fiveHour: {
+			utilization: account.unified_5h_utilization ?? null,
+			resetAt: account.unified_5h_reset ?? null,
+			isRepresentative: claimMatchesWindow(claim, "5h"),
+		},
+		sevenDay: {
+			utilization: account.unified_7d_utilization ?? null,
+			resetAt: account.unified_7d_reset ?? null,
+			isRepresentative: claimMatchesWindow(claim, "7d"),
+		},
+		fable: {
+			utilization: account.unified_fable_utilization ?? null,
+			resetAt: account.unified_fable_reset ?? null,
+			isRepresentative: claimMatchesWindow(claim, "fable"),
+		},
 	};
 }
 

@@ -124,6 +124,13 @@ describe("database schema", () => {
 				"rate_limit_reset",
 				"rate_limit_status",
 				"rate_limit_remaining",
+				"unified_5h_utilization",
+				"unified_5h_reset",
+				"unified_7d_utilization",
+				"unified_7d_reset",
+				"unified_fable_utilization",
+				"unified_fable_reset",
+				"unified_representative_claim",
 			]);
 
 			const providerColumn = accountColumns.find(

@@ -27,6 +27,23 @@ export interface AccountResponse {
 	};
 	rateLimitReset: string | null;
 	rateLimitRemaining: number | null;
+	usageWindows: {
+		fiveHour: {
+			utilization: number | null;
+			resetAt: string | null;
+			isRepresentative: boolean;
+		};
+		sevenDay: {
+			utilization: number | null;
+			resetAt: string | null;
+			isRepresentative: boolean;
+		};
+		fable: {
+			utilization: number | null;
+			resetAt: string | null;
+			isRepresentative: boolean;
+		};
+	};
 	sessionInfo: {
 		active: boolean;
 		startedAt: string | null;

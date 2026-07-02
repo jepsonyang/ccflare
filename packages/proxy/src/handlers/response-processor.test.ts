@@ -26,6 +26,13 @@ function createAccount(): Account {
 		rate_limit_reset: null,
 		rate_limit_status: null,
 		rate_limit_remaining: null,
+		unified_5h_utilization: null,
+		unified_5h_reset: null,
+		unified_7d_utilization: null,
+		unified_7d_reset: null,
+		unified_fable_utilization: null,
+		unified_fable_reset: null,
+		unified_representative_claim: null,
 	};
 }
 

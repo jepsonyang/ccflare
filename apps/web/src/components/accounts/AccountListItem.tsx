@@ -11,7 +11,7 @@ import {
 import { ProviderBadge } from "../ProviderBadge";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { RateLimitProgress } from "./RateLimitProgress";
+import { UsageWindows } from "./UsageWindows";
 
 function getAuthMethodLabel(authMethod: string): string {
 	switch (authMethod) {
@@ -72,9 +72,6 @@ export function AccountListItem({
 							>
 								{getAuthMethodLabel(account.auth_method)}
 							</Badge>
-							<span className="text-sm text-muted-foreground">
-								{presenter.weightDisplay}
-							</span>
 						</div>
 					</div>
 					<div className="flex items-center gap-2">
@@ -88,7 +85,15 @@ export function AccountListItem({
 							<span className="text-sm text-muted-foreground">Paused</span>
 						)}
 						{!presenter.isPaused && presenter.rateLimitStatus !== "OK" && (
-							<span className="text-sm text-destructive">
+							<span
+								className={`text-sm ${
+									presenter.rateLimitSeverity === "critical"
+										? "text-destructive"
+										: presenter.rateLimitSeverity === "warning"
+											? "text-warning"
+											: "text-success"
+								}`}
+							>
 								{presenter.rateLimitStatus}
 							</span>
 						)}
@@ -125,9 +130,7 @@ export function AccountListItem({
 					</Button>
 				</div>
 			</div>
-			{account.rateLimitReset && (
-				<RateLimitProgress resetIso={account.rateLimitReset} />
-			)}
+			<UsageWindows usageWindows={account.usageWindows} />
 		</div>
 	);
 }

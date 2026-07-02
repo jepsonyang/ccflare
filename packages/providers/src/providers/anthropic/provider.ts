@@ -3,6 +3,7 @@ import {
 	type Account,
 	getProviderDefaultBaseUrl,
 	isRecord,
+	RATE_LIMIT_BACKOFF_STATUS,
 } from "@ccflare/types";
 import { BaseProvider, deleteTransportHeaders } from "../../base";
 import type { RateLimitInfo } from "../../types";
@@ -19,6 +20,83 @@ const HARD_LIMIT_STATUSES = new Set([
 const _SOFT_WARNING_STATUSES = new Set(["allowed_warning", "queueing_soft"]);
 const PROVIDER_NAME = "anthropic" as const;
 const DEFAULT_BASE_URL = getProviderDefaultBaseUrl(PROVIDER_NAME);
+
+/**
+ * Normalize a unified utilization header to a 0-100 percentage.
+ * Accepts both fractional (0.0-1.0) and percentage (0-100) scales.
+ */
+function parseUtilization(raw: string | null): number | undefined {
+	if (raw == null) return undefined;
+	const n = Number(raw);
+	if (!Number.isFinite(n)) return undefined;
+	const pct = n <= 1 ? n * 100 : n;
+	return Math.min(100, Math.max(0, pct));
+}
+
+/** Convert a unix-seconds reset header to ms epoch. */
+function parseResetSeconds(raw: string | null): number | undefined {
+	if (raw == null) return undefined;
+	const n = Number(raw);
+	return Number.isFinite(n) ? n * 1000 : undefined;
+}
+
+/** Read the unified utilization windows from response headers. */
+function parseUnifiedWindows(response: Response): {
+	fiveHourUtilization?: number;
+	fiveHourResetTime?: number;
+	sevenDayUtilization?: number;
+	sevenDayResetTime?: number;
+	// Fable weekly bucket (per-model). Only returned when Fable is actually
+	// used, mirroring the official "You haven't used Fable yet" state.
+	fableUtilization?: number;
+	fableResetTime?: number;
+	representativeClaim?: string;
+} {
+	return {
+		...(() => {
+			const v = parseUtilization(
+				response.headers.get("anthropic-ratelimit-unified-5h-utilization"),
+			);
+			return v !== undefined ? { fiveHourUtilization: v } : {};
+		})(),
+		...(() => {
+			const v = parseResetSeconds(
+				response.headers.get("anthropic-ratelimit-unified-5h-reset"),
+			);
+			return v !== undefined ? { fiveHourResetTime: v } : {};
+		})(),
+		...(() => {
+			const v = parseUtilization(
+				response.headers.get("anthropic-ratelimit-unified-7d-utilization"),
+			);
+			return v !== undefined ? { sevenDayUtilization: v } : {};
+		})(),
+		...(() => {
+			const v = parseResetSeconds(
+				response.headers.get("anthropic-ratelimit-unified-7d-reset"),
+			);
+			return v !== undefined ? { sevenDayResetTime: v } : {};
+		})(),
+		...(() => {
+			const v = parseUtilization(
+				response.headers.get("anthropic-ratelimit-unified-7d_oi-utilization"),
+			);
+			return v !== undefined ? { fableUtilization: v } : {};
+		})(),
+		...(() => {
+			const v = parseResetSeconds(
+				response.headers.get("anthropic-ratelimit-unified-7d_oi-reset"),
+			);
+			return v !== undefined ? { fableResetTime: v } : {};
+		})(),
+		...(() => {
+			const v = response.headers.get(
+				"anthropic-ratelimit-unified-representative-claim",
+			);
+			return v ? { representativeClaim: v } : {};
+		})(),
+	};
+}
 
 function parseAnthropicUsage(value: unknown):
 	| {
@@ -97,6 +175,10 @@ export class AnthropicProvider extends BaseProvider {
 	}
 
 	parseRateLimit(response: Response): RateLimitInfo {
+		// Unified utilization windows are returned on normal responses too,
+		// so always read them and merge into whichever branch we return.
+		const windows = parseUnifiedWindows(response);
+
 		// Check for unified rate limit headers
 		const statusHeader = response.headers.get(
 			"anthropic-ratelimit-unified-status",
@@ -121,12 +203,13 @@ export class AnthropicProvider extends BaseProvider {
 				resetTime,
 				statusHeader: statusHeader || undefined,
 				remaining,
+				...windows,
 			};
 		}
 
 		// Fall back to 429 status with x-ratelimit-reset header
 		if (response.status !== 429) {
-			return { isRateLimited: false };
+			return { isRateLimited: false, ...windows };
 		}
 
 		const rateLimitReset = response.headers.get("x-ratelimit-reset");
@@ -134,9 +217,14 @@ export class AnthropicProvider extends BaseProvider {
 			? parseInt(rateLimitReset, 10) * 1000
 			: Date.now() + 60000; // Default to 1 minute
 
+		// A plain 429 with no unified window headers is a short request-rate
+		// backoff, not a 5h/7d quota exhaustion. Tag it so the UI can surface
+		// the remaining backoff time.
 		return {
 			isRateLimited: true,
 			resetTime,
+			statusHeader: RATE_LIMIT_BACKOFF_STATUS,
+			...windows,
 		};
 	}
 
