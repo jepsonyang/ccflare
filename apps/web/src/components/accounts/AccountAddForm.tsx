@@ -7,6 +7,7 @@ import {
 	isOAuthProvider,
 	type OAuthProvider,
 } from "@ccflare/types";
+import { Check, Copy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -58,6 +59,7 @@ export function AccountAddForm({
 	const [authUrl, setAuthUrl] = useState("");
 	const [authorizationCode, setAuthorizationCode] = useState("");
 	const [isCompletingOAuth, setIsCompletingOAuth] = useState(false);
+	const [linkCopied, setLinkCopied] = useState(false);
 	const [newAccount, setNewAccount] = useState({
 		name: "",
 		provider: "" as "" | AccountProvider,
@@ -76,8 +78,20 @@ export function AccountAddForm({
 		setAuthUrl("");
 		setAuthorizationCode("");
 		setIsCompletingOAuth(false);
+		setLinkCopied(false);
 		setNewAccount({ name: "", provider: "", apiKey: "" });
 	}, []);
+
+	const handleCopyAuthLink = useCallback(async () => {
+		if (!authUrl) return;
+		try {
+			await navigator.clipboard.writeText(authUrl);
+			setLinkCopied(true);
+			setTimeout(() => setLinkCopied(false), 2000);
+		} catch {
+			onError("Failed to copy the authorization link");
+		}
+	}, [authUrl, onError]);
 
 	useEffect(() => {
 		if (authStep !== "waiting" || !sessionId) {
@@ -318,16 +332,34 @@ export function AccountAddForm({
 							</p>
 						</div>
 						{authUrl && (
-							<Button
-								variant="outline"
-								onClick={() => {
-									if (typeof window !== "undefined") {
-										window.open(authUrl, "_blank", "noopener,noreferrer");
-									}
-								}}
-							>
-								Open Authorization Page Again
-							</Button>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									variant="outline"
+									onClick={() => {
+										if (typeof window !== "undefined") {
+											window.open(authUrl, "_blank", "noopener,noreferrer");
+										}
+									}}
+								>
+									Open Authorization Page Again
+								</Button>
+								<Button
+									variant="outline"
+									onClick={() => void handleCopyAuthLink()}
+								>
+									{linkCopied ? (
+										<>
+											<Check />
+											Copied!
+										</>
+									) : (
+										<>
+											<Copy />
+											Copy Authorization Link
+										</>
+									)}
+								</Button>
+							</div>
 						)}
 					</div>
 					<div className="flex gap-2">
