@@ -1,5 +1,10 @@
 import { requestEvents } from "@ccflare/core";
-import { BadRequest, errorResponse, ServiceUnavailable } from "@ccflare/http";
+import {
+	BadRequest,
+	errorResponse,
+	ServiceUnavailable,
+	sanitizeProxyHeaders,
+} from "@ccflare/http";
 import { Logger } from "@ccflare/logger";
 import type { AccountProvider } from "@ccflare/types";
 import {
@@ -328,6 +333,17 @@ async function tryProviderFamily(
 			);
 
 			if (processProxyResponse(response, account, requestContext)) {
+				// The response was treated as a rate-limit and the account was
+				// backed off. Log the actual upstream body so we can tell a real
+				// quota/rate limit apart from a non-limit error that merely shares
+				// the 429 status (Anthropic returns the reason in the body).
+				const limitBody = await response
+					.clone()
+					.text()
+					.catch(() => "");
+				log.warn(
+					`Upstream ${actualProvider}/${account.name} ${response.status} treated as rate-limit: ${limitBody.slice(0, 500)}`,
+				);
 				continue;
 			}
 
@@ -336,10 +352,16 @@ async function tryProviderFamily(
 				log.warn(
 					`Upstream ${actualProvider}/${account.name} returned ${response.status}: ${errorBody.slice(0, 500)}`,
 				);
+				// Bun's fetch has already decompressed the body when we call
+				// response.text(), so strip content-encoding/-length here. Otherwise
+				// a gzip'd upstream error body is forwarded with a stale
+				// `Content-Encoding: gzip` header and downstream clients (e.g.
+				// LiteLLM) fail with "Error -3 while decompressing", masking the
+				// real error.
 				lastErrorResponse = new Response(errorBody, {
 					status: response.status,
 					statusText: response.statusText,
-					headers: response.headers,
+					headers: sanitizeProxyHeaders(response.headers),
 				});
 				continue;
 			}

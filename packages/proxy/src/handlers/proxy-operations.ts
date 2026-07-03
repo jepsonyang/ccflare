@@ -128,6 +128,16 @@ export async function proxyWithAccount(
 		// Process response and check for rate limit
 		const isRateLimited = processProxyResponse(response, account, ctx);
 		if (isRateLimited) {
+			// Log the actual upstream body behind the rate-limit decision so a
+			// real quota/rate limit can be told apart from a non-limit error that
+			// merely shares the 429 status (Anthropic puts the reason in the body).
+			const limitBody = await response
+				.clone()
+				.text()
+				.catch(() => "");
+			log.warn(
+				`Upstream ${ctx.providerName}/${account.name} ${response.status} treated as rate-limit: ${limitBody.slice(0, 500)}`,
+			);
 			return null; // Signal to try next account
 		}
 
