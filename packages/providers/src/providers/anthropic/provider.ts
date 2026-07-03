@@ -40,6 +40,26 @@ function parseResetSeconds(raw: string | null): number | undefined {
 	return Number.isFinite(n) ? n * 1000 : undefined;
 }
 
+/**
+ * Parse an HTTP `Retry-After` header to an absolute ms epoch reset time.
+ * Supports both the delay-seconds form (e.g. "12") and the HTTP-date form.
+ * Returns undefined when the header is absent or unparseable.
+ */
+function parseRetryAfter(raw: string | null): number | undefined {
+	if (raw == null) return undefined;
+	const trimmed = raw.trim();
+	if (trimmed === "") return undefined;
+
+	// delay-seconds form: a non-negative integer number of seconds from now.
+	if (/^\d+$/.test(trimmed)) {
+		return Date.now() + Number(trimmed) * 1000;
+	}
+
+	// HTTP-date form: an absolute timestamp.
+	const dateMs = Date.parse(trimmed);
+	return Number.isNaN(dateMs) ? undefined : dateMs;
+}
+
 /** Read the unified utilization windows from response headers. */
 function parseUnifiedWindows(response: Response): {
 	fiveHourUtilization?: number;
@@ -212,10 +232,13 @@ export class AnthropicProvider extends BaseProvider {
 			return { isRateLimited: false, ...windows };
 		}
 
-		const rateLimitReset = response.headers.get("x-ratelimit-reset");
-		const resetTime = rateLimitReset
-			? parseInt(rateLimitReset, 10) * 1000
-			: Date.now() + 60000; // Default to 1 minute
+		// Prefer the standard `retry-after` header Anthropic returns for short
+		// request-rate backoffs (relative seconds, or an HTTP-date). Fall back to
+		// the absolute `x-ratelimit-reset` header, then to a 1-minute default.
+		const resetTime =
+			parseRetryAfter(response.headers.get("retry-after")) ??
+			parseResetSeconds(response.headers.get("x-ratelimit-reset")) ??
+			Date.now() + 60000; // Default to 1 minute
 
 		// A plain 429 with no unified window headers is a short request-rate
 		// backoff, not a 5h/7d quota exhaustion. Tag it so the UI can surface

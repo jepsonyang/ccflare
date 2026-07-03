@@ -148,4 +148,57 @@ describe("AnthropicProvider", () => {
 		expect(info.statusHeader).toBe("backoff");
 		expect(info.resetTime).toBe(resetSeconds * 1000);
 	});
+
+	it("derives backoff reset from the retry-after delay-seconds header", () => {
+		const before = Date.now();
+		const response = new Response("{}", {
+			status: 429,
+			headers: { "retry-after": "8" },
+		});
+		const info = provider.parseRateLimit(response);
+		const after = Date.now();
+		expect(info.isRateLimited).toBe(true);
+		expect(info.statusHeader).toBe("backoff");
+		expect(info.resetTime).toBeGreaterThanOrEqual(before + 8_000);
+		expect(info.resetTime).toBeLessThanOrEqual(after + 8_000);
+	});
+
+	it("derives backoff reset from a retry-after HTTP-date header", () => {
+		const resetDate = new Date(Date.now() + 30_000);
+		resetDate.setMilliseconds(0); // HTTP-date has second precision
+		const response = new Response("{}", {
+			status: 429,
+			headers: { "retry-after": resetDate.toUTCString() },
+		});
+		const info = provider.parseRateLimit(response);
+		expect(info.resetTime).toBe(resetDate.getTime());
+	});
+
+	it("prefers retry-after over x-ratelimit-reset for backoff", () => {
+		const before = Date.now();
+		const staleReset = Math.floor((Date.now() + 90_000) / 1000);
+		const response = new Response("{}", {
+			status: 429,
+			headers: {
+				"retry-after": "5",
+				"x-ratelimit-reset": String(staleReset),
+			},
+		});
+		const info = provider.parseRateLimit(response);
+		const after = Date.now();
+		expect(info.resetTime).toBeGreaterThanOrEqual(before + 5_000);
+		expect(info.resetTime).toBeLessThanOrEqual(after + 5_000);
+	});
+
+	it("falls back to a 1-minute backoff when no reset headers are present", () => {
+		const before = Date.now();
+		const response = new Response("{}", { status: 429 });
+		const info = provider.parseRateLimit(response);
+		const after = Date.now();
+		expect(info.isRateLimited).toBe(true);
+		expect(info.statusHeader).toBe("backoff");
+		expect(info.resetTime).toBeGreaterThanOrEqual(before + 60_000);
+		expect(info.resetTime).toBeLessThanOrEqual(after + 60_000);
+	});
+
 });
