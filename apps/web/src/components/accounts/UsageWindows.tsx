@@ -169,13 +169,14 @@ export function UsageWindows({ usageWindows, className }: UsageWindowsProps) {
 						now={now}
 						withDate
 					/>
-					<UsageBar
-						label="Weekly · Fable"
-						window={usageWindows.fable}
-						now={now}
-						withDate
-						emptyText="You haven't used Fable yet"
-					/>
+					{usageWindows.fable.utilization != null && (
+						<UsageBar
+							label="Weekly · Fable"
+							window={usageWindows.fable}
+							now={now}
+							withDate
+						/>
+					)}
 				</>
 			) : (
 				<p className="text-xs text-muted-foreground/70">
