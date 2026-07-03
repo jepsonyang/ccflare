@@ -114,4 +114,37 @@ describe("transformAnthropicResponseToOpenAIResponses", () => {
 			'"summary":[{"type":"summary_text","text":"Tool summary: Searched in auth/"}]',
 		);
 	});
+
+	it("forwards a keep-alive comment for ping frames that produce no output", async () => {
+		// Deliver the ping as its own network chunk, the way Anthropic emits
+		// keep-alives during a long thinking pause (no content frames alongside).
+		const encoder = new TextEncoder();
+		const chunks = [
+			'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_test","model":"claude-opus-4.6","usage":{"input_tokens":10,"output_tokens":0}}}\n\n',
+			'event: ping\ndata: {"type":"ping"}\n\n',
+			'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}\n\n',
+			'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+		];
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				for (const chunk of chunks) {
+					controller.enqueue(encoder.encode(chunk));
+				}
+				controller.close();
+			},
+		});
+
+		const response = await transformAnthropicResponseToOpenAIChat(
+			new Response(body, {
+				status: 200,
+				headers: { "content-type": "text/event-stream; charset=utf-8" },
+			}),
+		);
+
+		const text = await response.text();
+		// The ping frame keeps the stream alive during long thinking pauses.
+		expect(text).toContain(": ping");
+		// Real content still passes through.
+		expect(text).toContain('"content":"hi"');
+	});
 });

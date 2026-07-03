@@ -348,6 +348,14 @@ export function createTransformedSseResponse(
 					}
 					if (parts.length > 0) {
 						controller.enqueue(state.encoder.encode(parts.join("")));
+					} else if (frames.length > 0) {
+						// The upstream sent frames that produce no downstream output
+						// (e.g. Anthropic `ping` keep-alives). Forward an SSE comment so
+						// bytes keep flowing during long "thinking" pauses; without this,
+						// an idle intermediary (nginx/litellm/client) closes the stream
+						// with "Connection closed while thinking". SSE comment lines start
+						// with ":" and are ignored by every compliant client.
+						controller.enqueue(state.encoder.encode(": ping\n\n"));
 					}
 					if (done) {
 						break;
