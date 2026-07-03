@@ -135,6 +135,7 @@ export function AccountsTab() {
 						onPauseToggle={(account) => model.togglePause(account)}
 						onRemove={handleRemoveAccount}
 						onRename={(account) => setRenameDialog({ isOpen: true, account })}
+						onRefresh={(account) => model.refreshAccount(account.id)}
 					/>
 				</CardContent>
 			</Card>

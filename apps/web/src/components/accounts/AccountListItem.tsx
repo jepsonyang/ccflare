@@ -6,8 +6,11 @@ import {
 	Edit2,
 	Pause,
 	Play,
+	RefreshCw,
 	Trash2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { cn } from "../../lib/utils";
 import { ProviderBadge } from "../ProviderBadge";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -33,7 +36,11 @@ interface AccountListItemProps {
 	onPauseToggle: (account: AccountResponse) => void;
 	onRemove: (account: AccountResponse) => void;
 	onRename: (account: AccountResponse) => void;
+	onRefresh: (account: AccountResponse) => Promise<unknown>;
 }
+
+// Keep in sync with the server-side REFRESH_MIN_INTERVAL_MS cooldown.
+const REFRESH_COOLDOWN_MS = 60_000;
 
 export function AccountListItem({
 	account,
@@ -41,8 +48,48 @@ export function AccountListItem({
 	onPauseToggle,
 	onRemove,
 	onRename,
+	onRefresh,
 }: AccountListItemProps) {
 	const presenter = new AccountPresenter(account);
+
+	const isOAuth = account.auth_method === "oauth";
+	const [refreshing, setRefreshing] = useState(false);
+	const [cooldownUntil, setCooldownUntil] = useState(0);
+	const [nowTs, setNowTs] = useState(() => Date.now());
+
+	// While cooling down, tick once a second so the button re-enables on time.
+	useEffect(() => {
+		if (cooldownUntil <= Date.now()) return;
+		const id = setInterval(() => setNowTs(Date.now()), 1000);
+		return () => clearInterval(id);
+	}, [cooldownUntil]);
+
+	const cooling = nowTs < cooldownUntil;
+	const refreshDisabled = refreshing || cooling;
+
+	const handleRefresh = async () => {
+		if (refreshDisabled) return;
+		setRefreshing(true);
+		try {
+			const result = (await onRefresh(account)) as
+				| { retryAfterMs?: number }
+				| undefined;
+			setCooldownUntil(
+				Date.now() + (result?.retryAfterMs ?? REFRESH_COOLDOWN_MS),
+			);
+		} catch {
+			// Error is surfaced by the page model; allow an immediate retry.
+		} finally {
+			setRefreshing(false);
+			setNowTs(Date.now());
+		}
+	};
+
+	const refreshTitle = refreshing
+		? "Refreshing usage…"
+		: cooling
+			? `Available in ${Math.ceil((cooldownUntil - nowTs) / 1000)}s`
+			: "Refresh usage";
 
 	return (
 		<div
@@ -100,6 +147,19 @@ export function AccountListItem({
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
+					{isOAuth && (
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={handleRefresh}
+							disabled={refreshDisabled}
+							title={refreshTitle}
+						>
+							<RefreshCw
+								className={cn("h-4 w-4", refreshing && "animate-spin")}
+							/>
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						size="sm"

@@ -278,6 +278,21 @@ class API extends HttpClient {
 		}
 	}
 
+	async refreshAccount(
+		accountId: string,
+	): Promise<{ skipped?: boolean; retryAfterMs?: number }> {
+		try {
+			return await this.postJson<{ skipped?: boolean; retryAfterMs?: number }>(
+				`/api/accounts/${accountId}/refresh`,
+			);
+		} catch (error) {
+			if (error instanceof HttpError) {
+				throw new Error(error.message);
+			}
+			throw error;
+		}
+	}
+
 	async renameAccount(
 		accountId: string,
 		newName: string,

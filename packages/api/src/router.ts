@@ -1,5 +1,6 @@
 import { validateNumber } from "@ccflare/core";
 import { errorResponse, NotFound } from "@ccflare/http";
+import { createAccountRefreshHandler } from "./handlers/account-refresh";
 import {
 	createAccountAddHandler,
 	createAccountPauseHandler,
@@ -113,6 +114,7 @@ export class APIRouter {
 		const accountRenameHandler = createAccountRenameHandler(dbOps);
 		const accountUpdateHandler = createAccountUpdateHandler(dbOps);
 		const accountRemoveHandler = createAccountRemoveHandler(dbOps);
+		const accountRefreshHandler = createAccountRefreshHandler(dbOps, config);
 
 		// Pre-instantiate auth handlers
 		const authInitHandler = createAuthInitHandler(dbOps);
@@ -201,6 +203,11 @@ export class APIRouter {
 			"POST",
 			"/api/accounts/:accountId/rename",
 			(req, _url, params) => accountRenameHandler(req, params.accountId),
+		);
+		this.addDynamicRoute(
+			"POST",
+			"/api/accounts/:accountId/refresh",
+			(req, _url, params) => accountRefreshHandler(req, params.accountId),
 		);
 		this.addDynamicRoute(
 			"PATCH",

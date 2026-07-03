@@ -118,6 +118,12 @@ export function useAccountsPageModel() {
 		onError: (err) => setActionError(formatError(err)),
 	});
 
+	const refreshAccount = useMutation({
+		mutationFn: (accountId: string) => api.refreshAccount(accountId),
+		onSuccess: () => invalidateAccounts(),
+		onError: (err) => setActionError(formatError(err)),
+	});
+
 	// -- Computed --
 
 	const displayError = queryError ? formatError(queryError) : actionError;
@@ -137,6 +143,8 @@ export function useAccountsPageModel() {
 		removeAccount: (accountId: string) => removeAccount.mutateAsync(accountId),
 		renameAccount,
 		togglePause: (account: AccountResponse) => togglePause.mutateAsync(account),
+		refreshAccount: (accountId: string) =>
+			refreshAccount.mutateAsync(accountId),
 		isRenaming: renameAccountMutation.isPending,
 		clearError: () => setActionError(null),
 	};
