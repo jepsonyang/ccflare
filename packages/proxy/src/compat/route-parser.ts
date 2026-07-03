@@ -19,6 +19,11 @@ export function parseCompatibilityRoute(
 ): ParsedCompatibilityRoute | null {
 	switch (pathname) {
 		case "/v1/ccflare/anthropic/messages":
+		// Alias: LiteLLM's Anthropic passthrough adapter appends `/v1/messages`
+		// to the configured api_base, so an api_base of
+		// `.../v1/ccflare/anthropic` yields this path. Accept it so callers can
+		// point straight at the anthropic compat entry without a rewrite.
+		case "/v1/ccflare/anthropic/v1/messages":
 			return { kind: "anthropic-messages" };
 		case "/v1/ccflare/openai/chat/completions":
 			return { kind: "openai-chat-completions" };
