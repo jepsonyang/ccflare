@@ -63,7 +63,7 @@ export class AccountPresenter {
 	}
 
 	get rateLimitSeverity(): RateLimitSeverity {
-		return getAccountRateLimitSeverity(this.account.rateLimitStatus.code);
+		return getAccountRateLimitSeverity(this.account.rateLimitStatus);
 	}
 
 	get sessionInfo(): string {

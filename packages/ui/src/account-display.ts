@@ -69,19 +69,32 @@ function formatBackoffDuration(ms: number): string {
 	return out;
 }
 
-export function formatAccountRateLimitStatus(
-	rateLimit:
-		| AccountRateLimitInfo
-		| AccountRateLimitStatusView
-		| {
-				code: string;
-				isLimited: boolean;
-				until?: number | string | null;
-		  },
-	now: number = Date.now(),
+type RateLimitStatusInput =
+	| AccountRateLimitInfo
+	| AccountRateLimitStatusView
+	| {
+			code: string;
+			isLimited: boolean;
+			until?: number | string | null;
+	  };
+
+/** Uppercase the first character, leaving the rest of the label as-is. */
+function capitalize(text: string): string {
+	return text.length === 0
+		? text
+		: text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * Raw (lowercase) rate-limit label. Kept internal so the single public
+ * formatter can capitalize every branch in one place.
+ */
+function rawAccountRateLimitStatus(
+	rateLimit: RateLimitStatusInput,
+	now: number,
 ): string {
 	if (rateLimit.code === "paused") {
-		return "Paused";
+		return "paused";
 	}
 
 	const untilTs = toTimestamp(rateLimit.until ?? null);
@@ -92,32 +105,57 @@ export function formatAccountRateLimitStatus(
 		if (rateLimit.isLimited && untilTs && untilTs > now) {
 			return `backoff (${formatBackoffDuration(untilTs - now)})`;
 		}
-		return "OK";
+		return "allowed";
 	}
 
 	// Quota-window rate limit: the reset time is already shown by the usage
 	// windows below, so keep this to a plain status without a countdown.
 	if (rateLimit.isLimited && untilTs && untilTs > now) {
-		return "Rate limited";
+		return "rate limited";
 	}
 
-	if (rateLimit.code !== "ok") {
-		return rateLimit.code;
+	// Healthy account. Both the internal "ok" default and Anthropic's native
+	// "allowed" render as the same green "Allowed" label.
+	if (rateLimit.code === "ok" || rateLimit.code === "allowed") {
+		return "allowed";
 	}
 
-	return "OK";
+	return rateLimit.code;
+}
+
+export function formatAccountRateLimitStatus(
+	rateLimit: RateLimitStatusInput,
+	now: number = Date.now(),
+): string {
+	return capitalize(rawAccountRateLimitStatus(rateLimit, now));
 }
 
 export type RateLimitSeverity = "normal" | "warning" | "critical";
 
 /**
- * Severity bucket for a rate-limit status code, for color coding.
+ * Severity bucket for a rate-limit status, for color coding. Reads the same
+ * `rateLimit` object the text formatter uses so the label and its color can
+ * never disagree (e.g. "Rate limited" text always paired with a red/critical
+ * color, never a stale green from an out-of-date status code).
  * - warning: soft/temporary pressure (soft warning, soft queue, 429 backoff)
  * - critical: hard limits that block usage
  * - normal: allowed / ok / anything else
  */
-export function getAccountRateLimitSeverity(code: string): RateLimitSeverity {
-	switch (code) {
+export function getAccountRateLimitSeverity(
+	rateLimit: RateLimitStatusInput,
+	now: number = Date.now(),
+): RateLimitSeverity {
+	// Actively inside a rate-limit window: match whatever the text shows.
+	// A plain 429 backoff is soft pressure (warning); anything else that
+	// blocks the account is a hard limit (critical).
+	const untilTs = toTimestamp(rateLimit.until ?? null);
+	if (rateLimit.isLimited && untilTs && untilTs > now) {
+		return rateLimit.code === RATE_LIMIT_BACKOFF_STATUS
+			? "warning"
+			: "critical";
+	}
+
+	switch (rateLimit.code) {
 		case "allowed_warning":
 		case "queueing_soft":
 		case RATE_LIMIT_BACKOFF_STATUS:

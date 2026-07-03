@@ -84,7 +84,7 @@ export function AccountListItem({
 						{presenter.isPaused && (
 							<span className="text-sm text-muted-foreground">Paused</span>
 						)}
-						{!presenter.isPaused && presenter.rateLimitStatus !== "OK" && (
+						{!presenter.isPaused && (
 							<span
 								className={`text-sm ${
 									presenter.rateLimitSeverity === "critical"
