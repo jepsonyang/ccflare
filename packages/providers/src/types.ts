@@ -55,6 +55,16 @@ export interface Provider {
 	parseRateLimit(response: Response): RateLimitInfo;
 
 	/**
+	 * Given the body of a response already classified as rate-limited (429),
+	 * decide whether it is actually a *request-level* rejection rather than an
+	 * *account-level* limit. Request-level rejections (e.g. a 1M long-context
+	 * request that needs usage credits) must not back off the whole account,
+	 * since normal-size requests to the same account would still succeed.
+	 * Returns false/undefined when the 429 is a genuine account-level limit.
+	 */
+	isRequestLevelRateLimit?(body: string): boolean;
+
+	/**
 	 * Process the response before returning to client
 	 */
 	processResponse(

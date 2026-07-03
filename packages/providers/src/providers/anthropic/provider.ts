@@ -251,6 +251,28 @@ export class AnthropicProvider extends BaseProvider {
 		};
 	}
 
+	isRequestLevelRateLimit(body: string): boolean {
+		if (!body) return false;
+
+		// Anthropic reuses the 429 status + `rate_limit_error` type for
+		// request-level rejections such as a 1M long-context request that
+		// requires usage credits ("Usage credits are required for long context
+		// requests."). These are not account-level limits, so the reason lives
+		// in the body message rather than in any ratelimit header.
+		let message = body;
+		try {
+			const parsed = JSON.parse(body);
+			if (isRecord(parsed) && isRecord(parsed.error)) {
+				const m = parsed.error.message;
+				if (typeof m === "string") message = m;
+			}
+		} catch {
+			// Not JSON; fall back to scanning the raw body text.
+		}
+
+		return /long context/i.test(message);
+	}
+
 	async extractUsageInfo(response: Response): Promise<{
 		model?: string;
 		promptTokens?: number;

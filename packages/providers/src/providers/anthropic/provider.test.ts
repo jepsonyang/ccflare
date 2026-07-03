@@ -201,4 +201,26 @@ describe("AnthropicProvider", () => {
 		expect(info.resetTime).toBeLessThanOrEqual(after + 60_000);
 	});
 
+	it("flags a long-context credits 429 as a request-level rejection", () => {
+		const body = JSON.stringify({
+			type: "error",
+			error: {
+				type: "rate_limit_error",
+				message: "Usage credits are required for long context requests.",
+			},
+		});
+		expect(provider.isRequestLevelRateLimit(body)).toBe(true);
+	});
+
+	it("does not flag a genuine account rate-limit as request-level", () => {
+		const body = JSON.stringify({
+			type: "error",
+			error: {
+				type: "rate_limit_error",
+				message: "Number of requests has exceeded your rate limit.",
+			},
+		});
+		expect(provider.isRequestLevelRateLimit(body)).toBe(false);
+		expect(provider.isRequestLevelRateLimit("")).toBe(false);
+	});
 });

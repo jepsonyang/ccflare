@@ -4,7 +4,11 @@ import type { Account, RequestMeta } from "@ccflare/types";
 import { forwardToClient } from "../response-handler";
 import { ERROR_MESSAGES, type ResolvedProxyContext } from "./proxy-types";
 import { makeProxyRequest } from "./request-handler";
-import { handleProxyError, processProxyResponse } from "./response-processor";
+import {
+	buildRequestLevelErrorResponse,
+	handleProxyError,
+	processProxyResponse,
+} from "./response-processor";
 import { getValidAccessToken } from "./token-manager";
 
 const log = new Logger("ProxyOperations");
@@ -126,8 +130,8 @@ export async function proxyWithAccount(
 		const responseHeadersReceivedAt = Date.now();
 
 		// Process response and check for rate limit
-		const isRateLimited = processProxyResponse(response, account, ctx);
-		if (isRateLimited) {
+		const outcome = await processProxyResponse(response, account, ctx);
+		if (outcome === "rate-limited") {
 			// Log the actual upstream body behind the rate-limit decision so a
 			// real quota/rate limit can be told apart from a non-limit error that
 			// merely shares the 429 status (Anthropic puts the reason in the body).
@@ -141,6 +145,14 @@ export async function proxyWithAccount(
 			return null; // Signal to try next account
 		}
 
+		// A request-level rejection (e.g. 1M long-context needs credits) fails
+		// the same way on every account, so don't fail over. Return the reason
+		// as a non-retryable 400 rather than the upstream's misleading 429.
+		const clientResponse =
+			outcome === "request-level-error"
+				? buildRequestLevelErrorResponse(response)
+				: response;
+
 		// Forward response to client
 		return forwardToClient(
 			{
@@ -150,7 +162,7 @@ export async function proxyWithAccount(
 				account,
 				requestHeaders: req.headers,
 				requestBody: requestBodyBuffer,
-				response,
+				response: clientResponse,
 				timestamp: requestMeta.timestamp,
 				upstreamRequestStartedAt,
 				responseHeadersReceivedAt,

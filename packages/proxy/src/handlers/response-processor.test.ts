@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import type { Account } from "@ccflare/types";
 import type { ResolvedProxyContext } from "./proxy-types";
-import { processProxyResponse } from "./response-processor";
+import {
+	buildRequestLevelErrorResponse,
+	processProxyResponse,
+} from "./response-processor";
 
 function createAccount(): Account {
 	return {
@@ -91,7 +94,7 @@ function createContext(rateLimitInfo: {
 }
 
 describe("processProxyResponse", () => {
-	it("keeps successful response processing limited to rate-limit metadata updates", () => {
+	it("keeps successful response processing limited to rate-limit metadata updates", async () => {
 		const account = createAccount();
 		const { ctx, calls, flush } = createContext({
 			isRateLimited: false,
@@ -100,18 +103,18 @@ describe("processProxyResponse", () => {
 			remaining: 17,
 		});
 
-		const isRateLimited = processProxyResponse(
+		const outcome = await processProxyResponse(
 			new Response("ok", { status: 200 }),
 			account,
 			ctx,
 		);
 		flush();
 
-		expect(isRateLimited).toBe(false);
+		expect(outcome).toBe("ok");
 		expect(calls).toEqual(["updateAccountRateLimitMeta"]);
 	});
 
-	it("does not increment account usage when rejecting a rate-limited response", () => {
+	it("does not increment account usage when rejecting a rate-limited response", async () => {
 		const account = createAccount();
 		const { ctx, calls, flush } = createContext({
 			isRateLimited: true,
@@ -120,17 +123,70 @@ describe("processProxyResponse", () => {
 			remaining: 0,
 		});
 
-		const isRateLimited = processProxyResponse(
+		const outcome = await processProxyResponse(
 			new Response("rate limited", { status: 429 }),
 			account,
 			ctx,
 		);
 		flush();
 
-		expect(isRateLimited).toBe(true);
+		expect(outcome).toBe("rate-limited");
 		expect(calls).toEqual([
 			"markAccountRateLimited",
 			"updateAccountRateLimitMeta",
 		]);
+	});
+
+	it("does not back off the account for a request-level 429", async () => {
+		const account = createAccount();
+		const { ctx, calls, flush } = createContext({
+			isRateLimited: true,
+			statusHeader: "backoff",
+			resetTime: 1_710_000_000_000,
+			remaining: 0,
+		});
+		// Flag this 429 body as a request-level rejection.
+		(
+			ctx.provider as unknown as {
+				isRequestLevelRateLimit: (body: string) => boolean;
+			}
+		).isRequestLevelRateLimit = (body: string) => body.includes("long context");
+
+		const outcome = await processProxyResponse(
+			new Response(
+				JSON.stringify({
+					type: "error",
+					error: {
+						type: "rate_limit_error",
+						message: "Usage credits are required for long context requests.",
+					},
+				}),
+				{ status: 429 },
+			),
+			account,
+			ctx,
+		);
+		flush();
+
+		expect(outcome).toBe("request-level-error");
+		expect(calls).toEqual([]);
+	});
+});
+
+describe("buildRequestLevelErrorResponse", () => {
+	it("rewrites an upstream 429 as a non-retryable 400 preserving the body", async () => {
+		const body = JSON.stringify({
+			type: "error",
+			error: {
+				type: "rate_limit_error",
+				message: "Usage credits are required for long context requests.",
+			},
+		});
+		const rewritten = buildRequestLevelErrorResponse(
+			new Response(body, { status: 429 }),
+		);
+
+		expect(rewritten.status).toBe(400);
+		expect(await rewritten.text()).toBe(body);
 	});
 });

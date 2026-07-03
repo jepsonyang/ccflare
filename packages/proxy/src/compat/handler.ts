@@ -332,7 +332,12 @@ async function tryProviderFamily(
 				`Upstream ${actualProvider}/${account.name}: ${response.status} ${response.headers.get("content-type")}`,
 			);
 
-			if (processProxyResponse(response, account, requestContext)) {
+			const outcome = await processProxyResponse(
+				response,
+				account,
+				requestContext,
+			);
+			if (outcome === "rate-limited") {
 				// The response was treated as a rate-limit and the account was
 				// backed off. Log the actual upstream body so we can tell a real
 				// quota/rate limit apart from a non-limit error that merely shares
@@ -345,6 +350,21 @@ async function tryProviderFamily(
 					`Upstream ${actualProvider}/${account.name} ${response.status} treated as rate-limit: ${limitBody.slice(0, 500)}`,
 				);
 				continue;
+			}
+
+			if (outcome === "request-level-error") {
+				// A request-level rejection (e.g. 1M long-context needs credits)
+				// fails the same way on every account, so don't fail over. Return
+				// the reason as a non-retryable 400 instead of the upstream 429.
+				const errorBody = await response.text();
+				log.warn(
+					`Upstream ${actualProvider}/${account.name} ${response.status} request-level rejection: ${errorBody.slice(0, 500)}`,
+				);
+				return new Response(errorBody, {
+					status: 400,
+					statusText: "Bad Request",
+					headers: sanitizeProxyHeaders(response.headers),
+				});
 			}
 
 			if (!response.ok) {
