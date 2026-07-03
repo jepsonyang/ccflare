@@ -369,6 +369,60 @@ describe("handleCompatibilityProxy", () => {
 		).toBe(true);
 	});
 
+	it("merges caller anthropic-beta flags with the required ones", async () => {
+		let seenBeta: string | null = null;
+		globalThis.fetch = Object.assign(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				const request = new Request(input, init);
+				seenBeta = request.headers.get("anthropic-beta");
+				return new Response(
+					JSON.stringify({
+						id: "msg_test",
+						type: "message",
+						role: "assistant",
+						model: "claude-sonnet-4",
+						content: [{ type: "text", text: "ok" }],
+						stop_reason: "end_turn",
+						stop_sequence: null,
+						usage: { input_tokens: 10, output_tokens: 2 },
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				);
+			},
+			{ preconnect: originalFetch.preconnect },
+		) as typeof fetch;
+
+		const response = await handleCompatibilityProxy(
+			new Request("http://localhost:8080/v1/ccflare/anthropic/messages", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					// A feature-specific beta the client enabled (e.g. context mgmt).
+					"anthropic-beta": "context-management-2025-06-27",
+				},
+				body: JSON.stringify({
+					model: "anthropic/claude-sonnet-4",
+					max_tokens: 32,
+					messages: [{ role: "user", content: "hi" }],
+				}),
+			}),
+			new URL("http://localhost:8080/v1/ccflare/anthropic/messages"),
+			createProxyContext({
+				"claude-code": [createOAuthAccount("claude-code")],
+			}),
+		);
+
+		expect(response?.status).toBe(200);
+		const flags = (seenBeta as string | null)?.split(",") ?? [];
+		// Caller's flag is preserved...
+		expect(flags).toContain("context-management-2025-06-27");
+		// ...and ccflare's required flags are still present.
+		expect(flags).toContain("oauth-2025-04-20");
+		expect(flags).toContain("claude-code-20250219");
+		// No duplicates.
+		expect(new Set(flags).size).toBe(flags.length);
+	});
+
 	it("preserves mixed terminal outputs when codex responses are translated to chat completions", async () => {
 		globalThis.fetch = Object.assign(
 			async () =>

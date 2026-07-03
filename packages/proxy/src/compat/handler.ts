@@ -69,8 +69,39 @@ function buildResolvedContext(
 
 const ANTHROPIC_PROVIDERS = new Set<string>(["anthropic", "claude-code"]);
 const ANTHROPIC_VERSION = "2023-06-01";
-const ANTHROPIC_BETA =
-	"claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,prompt-caching-scope-2026-01-05,token-efficient-tools-2026-03-28";
+// Beta flags ccflare always requires for the Claude Code OAuth path.
+const REQUIRED_ANTHROPIC_BETAS = [
+	"claude-code-20250219",
+	"oauth-2025-04-20",
+	"interleaved-thinking-2025-05-14",
+	"prompt-caching-scope-2026-01-05",
+	"token-efficient-tools-2026-03-28",
+];
+
+/**
+ * Merge the caller's `anthropic-beta` flags with the ones ccflare requires.
+ *
+ * The client (or an upstream proxy like LiteLLM) may enable features that need
+ * their own beta flag — e.g. `context-management-2025-06-27` accompanies a
+ * `context_management` field in the body. Overwriting the header would drop
+ * those and make Anthropic reject the request ("Extra inputs are not
+ * permitted"). We union both sets and dedupe, preserving order.
+ */
+function mergeAnthropicBeta(existing: string | null): string {
+	const seen = new Set<string>();
+	const merged: string[] = [];
+	for (const value of [
+		...(existing ? existing.split(",") : []),
+		...REQUIRED_ANTHROPIC_BETAS,
+	]) {
+		const flag = value.trim();
+		if (flag && !seen.has(flag)) {
+			seen.add(flag);
+			merged.push(flag);
+		}
+	}
+	return merged.join(",");
+}
 
 function buildUpstreamHeaders(
 	sourceHeaders: Headers,
@@ -83,7 +114,10 @@ function buildUpstreamHeaders(
 	headers.set("accept", isStreaming ? "text/event-stream" : "application/json");
 	if (ANTHROPIC_PROVIDERS.has(providerName)) {
 		headers.set("anthropic-version", ANTHROPIC_VERSION);
-		headers.set("anthropic-beta", ANTHROPIC_BETA);
+		headers.set(
+			"anthropic-beta",
+			mergeAnthropicBeta(headers.get("anthropic-beta")),
+		);
 	}
 	return headers;
 }
