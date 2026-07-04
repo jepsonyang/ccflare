@@ -65,6 +65,16 @@ export function RequestDetailsModal({
 		[conversationChain],
 	);
 
+	// The list passes a body-less payload (bodies are stripped for speed). Fetch
+	// the full payload on open so the Request/Response tabs can show bodies; fall
+	// back to the prop for instant metadata/headers while it loads.
+	const { data: fullDetail } = useQuery({
+		queryKey: queryKeys.requestDetail(request.id),
+		queryFn: () => api.getRequestDetail(request.id),
+		enabled: isOpen,
+	});
+	const detail = fullDetail ?? request;
+
 	const formatHeaders = (headers: Record<string, string>) =>
 		formatHeadersBase(headers, beautifyMode);
 
@@ -154,30 +164,30 @@ export function RequestDetailsModal({
 								<CopyButton
 									variant="ghost"
 									size="sm"
-									getValue={() => formatHeaders(request.request.headers)}
+									getValue={() => formatHeaders(detail.request.headers)}
 								>
 									Copy
 								</CopyButton>
 							</div>
 							<pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-								{formatHeaders(request.request.headers)}
+								{formatHeaders(detail.request.headers)}
 							</pre>
 						</div>
 
-						{request.request.body && (
+						{detail.request.body && (
 							<div>
 								<div className="flex items-center justify-between mb-2">
 									<h3 className="font-semibold">Body</h3>
 									<CopyButton
 										variant="ghost"
 										size="sm"
-										getValue={() => formatBody(request.request.body)}
+										getValue={() => formatBody(detail.request.body)}
 									>
 										Copy
 									</CopyButton>
 								</div>
 								<pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-									{formatBody(request.request.body)}
+									{formatBody(detail.request.body)}
 								</pre>
 							</div>
 						)}
@@ -187,7 +197,7 @@ export function RequestDetailsModal({
 						value="response"
 						className="mt-4 space-y-4 overflow-y-auto max-h-[60vh]"
 					>
-						{request.response ? (
+						{detail.response ? (
 							<>
 								<div>
 									<div className="flex items-center justify-between mb-2">
@@ -196,8 +206,8 @@ export function RequestDetailsModal({
 											variant="ghost"
 											size="sm"
 											getValue={() =>
-												request.response
-													? formatHeaders(request.response.headers)
+												detail.response
+													? formatHeaders(detail.response.headers)
 													: ""
 											}
 										>
@@ -205,11 +215,11 @@ export function RequestDetailsModal({
 										</CopyButton>
 									</div>
 									<pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-										{formatHeaders(request.response.headers)}
+										{formatHeaders(detail.response.headers)}
 									</pre>
 								</div>
 
-								{request.response.body && (
+								{detail.response.body && (
 									<div>
 										<div className="flex items-center justify-between mb-2">
 											<h3 className="font-semibold">Body</h3>
@@ -217,8 +227,8 @@ export function RequestDetailsModal({
 												variant="ghost"
 												size="sm"
 												getValue={() =>
-													request.response
-														? formatBody(request.response.body)
+													detail.response
+														? formatBody(detail.response.body)
 														: ""
 												}
 											>
@@ -226,7 +236,7 @@ export function RequestDetailsModal({
 											</CopyButton>
 										</div>
 										<pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-											{formatBody(request.response.body)}
+											{formatBody(detail.response.body)}
 										</pre>
 									</div>
 								)}

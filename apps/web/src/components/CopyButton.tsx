@@ -8,7 +8,7 @@ interface CopyButtonProps {
 	 * String or function returning the string to copy.
 	 */
 	value?: string;
-	getValue?: () => string;
+	getValue?: () => string | Promise<string>;
 	/**
 	 * Forwarded props to underlying Button
 	 */
@@ -41,21 +41,23 @@ export function CopyButton({
 	const [copied, setCopied] = useState(false);
 	const timeoutRef = useRef<number | null>(null);
 
-	const handleCopy = () => {
-		const text = typeof getValue === "function" ? getValue() : (value ?? "");
-		if (!text) return;
+	const handleCopy = async () => {
+		try {
+			// getValue may be async (e.g. it fetches the full payload on demand).
+			const text =
+				typeof getValue === "function" ? await getValue() : (value ?? "");
+			if (!text) return;
 
-		navigator.clipboard
-			.writeText(text)
-			.then(() => {
-				setCopied(true);
-				// Reset after 1.5s
-				if (timeoutRef.current) {
-					window.clearTimeout(timeoutRef.current);
-				}
-				timeoutRef.current = window.setTimeout(() => setCopied(false), 1500);
-			})
-			.catch((err) => console.error("Failed to copy", err));
+			await navigator.clipboard.writeText(text);
+			setCopied(true);
+			// Reset after 1.5s
+			if (timeoutRef.current) {
+				window.clearTimeout(timeoutRef.current);
+			}
+			timeoutRef.current = window.setTimeout(() => setCopied(false), 1500);
+		} catch (err) {
+			console.error("Failed to copy", err);
+		}
 	};
 
 	return (

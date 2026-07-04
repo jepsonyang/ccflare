@@ -293,6 +293,12 @@ class API extends HttpClient {
 		);
 	}
 
+	async getRequestDetail(requestId: string): Promise<RequestPayload> {
+		return this.getJson<RequestPayload>(
+			`/api/requests/${encodeURIComponent(requestId)}/detail`,
+		);
+	}
+
 	async getAnalytics(
 		range: TimeRange = "24h",
 		filters?: {

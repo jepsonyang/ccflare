@@ -96,7 +96,9 @@ After the recent refactor, its internal modules are:
 - `dashboard-assets.ts`
 - `fetch-handler.ts`
 - `startup-banner.ts`
-- `startup-maintenance.ts`
+- `cleanup-scheduler.ts`
+- `compact-scheduler.ts`
+- `refresh-scheduler.ts`
 - `index.ts`
 
 ### Runtime Startup Flow
@@ -111,7 +113,8 @@ graph TD
     API[APIRouter]
     STRAT[SessionStrategy]
     PROXY_CTX[ProxyContext]
-    MAINT[runStartupMaintenance]
+    MAINT[startCleanupScheduler]
+    COMPACT[startCompactScheduler]
     FETCH[createServerFetchHandler]
     BUN[Bun.serve]
 
@@ -123,6 +126,7 @@ graph TD
     BOOT --> STRAT
     BOOT --> PROXY_CTX
     START --> MAINT
+    START --> COMPACT
     START --> FETCH
     FETCH --> BUN
 ```

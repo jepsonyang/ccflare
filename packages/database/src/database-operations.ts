@@ -361,6 +361,12 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		return this.requests.listPayloadsWithAccountNames(limit);
 	}
 
+	getRequestPayloadWithAccountName(
+		requestId: string,
+	): { id: string; json: string; account_name: string | null } | null {
+		return this.requests.getPayloadWithAccountName(requestId);
+	}
+
 	listResponseChainPayloadsWithAccountNames(
 		requestId: string,
 	): Array<{ id: string; json: string; account_name: string | null }> {
@@ -485,6 +491,21 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		const removedOrphans = this.requests.deleteOrphanedPayloads();
 		const removedPayloads = removedPayloadsByAge + removedOrphans;
 		return { removedRequests, removedPayloads };
+	}
+
+	/** Delete one batch of payloads older than the cutoff. Returns rows removed. */
+	deletePayloadsOlderThanBatch(cutoffTs: number, batchSize: number): number {
+		return this.requests.deletePayloadsOlderThanBatch(cutoffTs, batchSize);
+	}
+
+	/** Delete one batch of request-metadata rows older than the cutoff. */
+	deleteRequestsOlderThanBatch(cutoffTs: number, batchSize: number): number {
+		return this.requests.deleteOlderThanBatch(cutoffTs, batchSize);
+	}
+
+	/** Sweep payloads whose parent request no longer exists. Returns rows removed. */
+	deleteOrphanedPayloads(): number {
+		return this.requests.deleteOrphanedPayloads();
 	}
 
 	close(): void {

@@ -330,6 +330,25 @@ export class RequestRepository extends BaseRepository<RequestData> {
 		);
 	}
 
+	getPayloadWithAccountName(
+		requestId: string,
+	): { id: string; json: string; account_name: string | null } | null {
+		return this.get<{
+			id: string;
+			json: string;
+			account_name: string | null;
+		}>(
+			`
+			SELECT rp.id, rp.json, a.name as account_name
+			FROM request_payloads rp
+			JOIN requests r ON rp.id = r.id
+			LEFT JOIN accounts a ON r.account_used = a.id
+			WHERE rp.id = ?
+		`,
+			[requestId],
+		);
+	}
+
 	listResponseChainPayloadsWithAccountNames(
 		requestId: string,
 	): Array<{ id: string; json: string; account_name: string | null }> {
@@ -641,6 +660,31 @@ export class RequestRepository extends BaseRepository<RequestData> {
 		return this.runWithChanges(
 			`DELETE FROM request_payloads WHERE id IN (SELECT id FROM requests WHERE timestamp < ?)`,
 			[cutoffTs],
+		);
+	}
+
+	/**
+	 * Delete up to `batchSize` request-metadata rows older than the cutoff.
+	 * Batched so a large backlog can be cleared in small, quickly-committed
+	 * transactions that yield between batches instead of one long-held write
+	 * lock. Returns the number of rows removed in this batch (0 when drained).
+	 */
+	deleteOlderThanBatch(cutoffTs: number, batchSize: number): number {
+		return this.runWithChanges(
+			`DELETE FROM requests WHERE id IN (SELECT id FROM requests WHERE timestamp < ? LIMIT ?)`,
+			[cutoffTs, batchSize],
+		);
+	}
+
+	/**
+	 * Delete up to `batchSize` payloads whose request is older than the cutoff,
+	 * leaving the (small) request-metadata row intact. Batched like
+	 * {@link deleteOlderThanBatch}. Returns rows removed in this batch.
+	 */
+	deletePayloadsOlderThanBatch(cutoffTs: number, batchSize: number): number {
+		return this.runWithChanges(
+			`DELETE FROM request_payloads WHERE id IN (SELECT id FROM requests WHERE timestamp < ? LIMIT ?)`,
+			[cutoffTs, batchSize],
 		);
 	}
 }

@@ -60,18 +60,66 @@ export function createRequestsSummaryHandler(dbOps: DatabaseOperations) {
 }
 
 /**
- * Create a detailed requests handler with full payload data
+ * Strip the (potentially multi-MB) request/response bodies from a payload,
+ * keeping headers and all metadata. The Request History list never renders
+ * bodies — they are fetched on demand per row via the single-payload endpoint —
+ * so shipping them in the bulk list is pure overhead that stalls the page.
+ */
+function stripPayloadBodies(
+	payload: ReturnType<typeof parsePayloadRows>[number],
+): ReturnType<typeof parsePayloadRows>[number] {
+	return {
+		...payload,
+		request: { ...payload.request, body: null },
+		response: payload.response
+			? { ...payload.response, body: null }
+			: payload.response,
+	};
+}
+
+/**
+ * Create a detailed requests handler for the history list. Bodies are stripped
+ * (see {@link stripPayloadBodies}); use the single-payload endpoint to fetch a
+ * full body on demand.
  */
 export function createRequestsDetailHandler(dbOps: DatabaseOperations) {
 	return (limit = 100): Response => {
 		try {
 			return jsonResponse(
-				parsePayloadRows(dbOps.listRequestPayloadsWithAccountNames(limit)),
+				parsePayloadRows(dbOps.listRequestPayloadsWithAccountNames(limit)).map(
+					stripPayloadBodies,
+				),
 			);
 		} catch (error) {
 			log.error("Failed to load request details", error);
 			return errorResponse(
 				InternalServerError("Failed to load request details"),
+			);
+		}
+	};
+}
+
+/**
+ * Create a single-request detail handler returning the full payload WITH
+ * bodies. Backs the on-demand fetch when a user opens a request's details or
+ * copies it as JSON.
+ */
+export function createRequestDetailHandler(dbOps: DatabaseOperations) {
+	return (requestId: string): Response => {
+		try {
+			const row = dbOps.getRequestPayloadWithAccountName(requestId);
+			if (!row) {
+				return errorResponse(NotFound("Request payload not found"));
+			}
+			const [payload] = parsePayloadRows([row]);
+			if (!payload) {
+				return errorResponse(NotFound("Request payload not found"));
+			}
+			return jsonResponse(payload);
+		} catch (error) {
+			log.error("Failed to load request detail", error);
+			return errorResponse(
+				InternalServerError("Failed to load request detail"),
 			);
 		}
 	};

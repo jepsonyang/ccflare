@@ -37,6 +37,10 @@ export interface ConfigData {
 	dashboard_base_path?: string;
 	data_retention_days?: number;
 	request_retention_days?: number;
+	cleanup_interval_minutes?: number;
+	compact_schedule_enabled?: boolean;
+	compact_schedule_day?: number;
+	compact_schedule_time?: string;
 	[key: string]: string | number | boolean | undefined;
 }
 
@@ -72,6 +76,11 @@ function parseNumber(value: string | undefined): number | undefined {
 	return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/** True for a 24-hour "HH:MM" clock string, mirroring the refresh-schedule rule. */
+function isValidHhMm(value: string): boolean {
+	return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 function sanitizeConfigData(value: unknown): ConfigData {
 	if (!isRecord(value)) {
 		return {};
@@ -101,6 +110,8 @@ function sanitizeConfigData(value: unknown): ConfigData {
 		"port",
 		"data_retention_days",
 		"request_retention_days",
+		"cleanup_interval_minutes",
+		"compact_schedule_day",
 	] as const;
 
 	for (const key of numericKeys) {
@@ -225,7 +236,7 @@ export class Config extends EventEmitter {
 		}
 		const fromFile = this.data.data_retention_days;
 		if (typeof fromFile === "number") return this.clamp(fromFile, 1, 365);
-		return 7;
+		return 5;
 	}
 
 	setDataRetentionDays(days: number): void {
@@ -241,12 +252,71 @@ export class Config extends EventEmitter {
 		}
 		const fromFile = this.data.request_retention_days;
 		if (typeof fromFile === "number") return this.clamp(fromFile, 1, 3650);
-		return 365; // default metadata retention
+		return 5; // default metadata retention
 	}
 
 	setRequestRetentionDays(days: number): void {
 		const clamped = this.clamp(days, 1, 3650);
 		this.set("request_retention_days", clamped);
+	}
+
+	getCleanupIntervalMinutes(): number {
+		const fromEnv = process.env.CLEANUP_INTERVAL_MINUTES;
+		if (fromEnv) {
+			const n = parseInt(fromEnv, 10);
+			if (!Number.isNaN(n)) return this.clamp(n, 5, 1440);
+		}
+		const fromFile = this.data.cleanup_interval_minutes;
+		if (typeof fromFile === "number") return this.clamp(fromFile, 5, 1440);
+		return 360; // default: run the retention cleanup every 6 hours
+	}
+
+	setCleanupIntervalMinutes(minutes: number): void {
+		const clamped = this.clamp(minutes, 5, 1440);
+		this.set("cleanup_interval_minutes", clamped);
+	}
+
+	getCompactScheduleEnabled(): boolean {
+		const fromEnv = process.env.COMPACT_SCHEDULE_ENABLED;
+		if (fromEnv !== undefined) return fromEnv.toLowerCase() === "true";
+		const fromFile = this.data.compact_schedule_enabled;
+		if (typeof fromFile === "boolean") return fromFile;
+		return true; // default: monthly compact is on
+	}
+
+	getCompactScheduleDay(): number {
+		const fromEnv = process.env.COMPACT_SCHEDULE_DAY;
+		if (fromEnv) {
+			const n = parseInt(fromEnv, 10);
+			if (!Number.isNaN(n)) return this.clamp(n, 1, 28);
+		}
+		const fromFile = this.data.compact_schedule_day;
+		if (typeof fromFile === "number") return this.clamp(fromFile, 1, 28);
+		return 1; // default: 1st of the month
+	}
+
+	getCompactScheduleTime(): string {
+		const fromEnv = process.env.COMPACT_SCHEDULE_TIME;
+		if (fromEnv && isValidHhMm(fromEnv)) return fromEnv;
+		const fromFile = this.data.compact_schedule_time;
+		if (typeof fromFile === "string" && isValidHhMm(fromFile)) return fromFile;
+		return "03:00"; // default: 03:00 local time
+	}
+
+	setCompactSchedule(options: {
+		enabled?: boolean;
+		day?: number;
+		time?: string;
+	}): void {
+		if (typeof options.enabled === "boolean") {
+			this.set("compact_schedule_enabled", options.enabled);
+		}
+		if (typeof options.day === "number") {
+			this.set("compact_schedule_day", this.clamp(options.day, 1, 28));
+		}
+		if (typeof options.time === "string" && isValidHhMm(options.time)) {
+			this.set("compact_schedule_time", options.time);
+		}
 	}
 
 	getAllSettings(): Record<string, string | number | boolean | undefined> {
@@ -256,6 +326,10 @@ export class Config extends EventEmitter {
 			lb_strategy: this.getStrategy(),
 			data_retention_days: this.getDataRetentionDays(),
 			request_retention_days: this.getRequestRetentionDays(),
+			cleanup_interval_minutes: this.getCleanupIntervalMinutes(),
+			compact_schedule_enabled: this.getCompactScheduleEnabled(),
+			compact_schedule_day: this.getCompactScheduleDay(),
+			compact_schedule_time: this.getCompactScheduleTime(),
 		};
 	}
 

@@ -32,6 +32,7 @@ import {
 	createAuthSessionStatusHandler,
 } from "./handlers/oauth";
 import {
+	createRequestDetailHandler,
 	createRequestsConversationHandler,
 	createRequestsDetailHandler,
 	createRequestsSummaryHandler,
@@ -106,6 +107,7 @@ export class APIRouter {
 		const requestsDetailHandler = createRequestsDetailHandler(dbOps);
 		const requestsConversationHandler =
 			createRequestsConversationHandler(dbOps);
+		const requestDetailHandler = createRequestDetailHandler(dbOps);
 		const configHandlers = createConfigHandlers(config);
 		const logsStreamHandler = createLogsStreamHandler();
 		const logsHistoryHandler = createLogsHistoryHandler();
@@ -167,6 +169,11 @@ export class APIRouter {
 			"GET",
 			"/api/requests/:requestId/conversation",
 			(_req, _url, params) => requestsConversationHandler(params.requestId),
+		);
+		this.addDynamicRoute(
+			"GET",
+			"/api/requests/:requestId/detail",
+			(_req, _url, params) => requestDetailHandler(params.requestId),
 		);
 		this.staticHandlers.set("GET:/api/requests/stream", () =>
 			requestsStreamHandler(),

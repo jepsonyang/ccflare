@@ -19,6 +19,7 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
+import { api } from "../api";
 import { useRequestsPageModel } from "../hooks/useRequestsPageModel";
 import { getStatusCodeTextClass } from "../lib/request-status";
 import { CopyButton } from "./CopyButton";
@@ -549,20 +550,23 @@ export function RequestsTab() {
 											variant="ghost"
 											size="icon"
 											title="Copy as JSON"
-											getValue={() => {
+											getValue={async () => {
+												// The list holds body-less payloads; fetch the full
+												// one on demand so the copied JSON includes bodies.
+												const full = await api.getRequestDetail(request.id);
 												const decoded: RequestPayload & { decoded?: true } = {
-													...request,
+													...full,
 													request: {
-														...request.request,
-														body: request.request.body
-															? decodeBase64Body(request.request.body)
+														...full.request,
+														body: full.request.body
+															? decodeBase64Body(full.request.body)
 															: null,
 													},
-													response: request.response
+													response: full.response
 														? {
-																...request.response,
-																body: request.response.body
-																	? decodeBase64Body(request.response.body)
+																...full.response,
+																body: full.response.body
+																	? decodeBase64Body(full.response.body)
 																	: null,
 															}
 														: null,

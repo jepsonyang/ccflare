@@ -10,11 +10,12 @@ import {
 } from "@ccflare/proxy";
 import { serve } from "bun";
 import { bootstrapRuntime, logInitialAccountStatus } from "./bootstrap-runtime";
+import { startCleanupScheduler } from "./cleanup-scheduler";
+import { startCompactScheduler } from "./compact-scheduler";
 import { loadDashboardAssets, resetDashboardAssets } from "./dashboard-assets";
 import { createServerFetchHandler } from "./fetch-handler";
 import { startRefreshScheduler } from "./refresh-scheduler";
 import { createStartupBanner } from "./startup-banner";
-import { runStartupMaintenance } from "./startup-maintenance";
 
 const serverLog = new Logger("Server");
 const lifecycleLog = new Logger("ServerLifecycle", LogLevel.INFO, {
@@ -23,7 +24,8 @@ const lifecycleLog = new Logger("ServerLifecycle", LogLevel.INFO, {
 
 // Module-level server instance
 let serverInstance: ReturnType<typeof serve> | null = null;
-let stopRetentionJob: (() => void) | null = null;
+let stopCleanupJob: (() => void) | null = null;
+let stopCompactJob: (() => void) | null = null;
 let stopRefreshScheduler: (() => void) | null = null;
 let serverStopPromise: Promise<void> | null = null;
 
@@ -37,10 +39,17 @@ export interface StartServerOptions {
 	withDashboard?: boolean;
 }
 
-function stopRetentionMaintenance(): void {
-	if (stopRetentionJob) {
-		stopRetentionJob();
-		stopRetentionJob = null;
+function stopCleanupScheduling(): void {
+	if (stopCleanupJob) {
+		stopCleanupJob();
+		stopCleanupJob = null;
+	}
+}
+
+function stopCompactScheduling(): void {
+	if (stopCompactJob) {
+		stopCompactJob();
+		stopCompactJob = null;
 	}
 }
 
@@ -81,7 +90,8 @@ async function stopServerRuntime(): Promise<void> {
 			errors.push(toError("Failed to stop Bun server", error));
 		}
 
-		stopRetentionMaintenance();
+		stopCleanupScheduling();
+		stopCompactScheduling();
 		stopRefreshScheduling();
 
 		try {
@@ -147,7 +157,8 @@ export default function startServer(
 	const { config, dbOps, log, apiRouter, proxyContext, runtimeConfig } =
 		bootstrapRuntime(port, serverLog);
 
-	stopRetentionJob = runStartupMaintenance(config, dbOps);
+	stopCleanupJob = startCleanupScheduler(dbOps, config, log);
+	stopCompactJob = startCompactScheduler(dbOps, config, log);
 	stopRefreshScheduler = startRefreshScheduler(dbOps, config, log);
 
 	const fetchHandler = createServerFetchHandler({
