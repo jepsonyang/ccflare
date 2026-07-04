@@ -156,6 +156,10 @@ export interface HealthResponse {
 	strategy: StrategyName;
 	providers: AccountProvider[];
 	runtime?: RuntimeHealth;
+	// Server's local timezone (IANA name, e.g. "Asia/Shanghai") and its current
+	// UTC offset in minutes — scheduled refreshes fire in this timezone.
+	timezone: string;
+	utcOffsetMinutes: number;
 }
 
 // Config types

@@ -51,6 +51,7 @@ export function createApiKeyAccount(
 		unified_fable_utilization: null,
 		unified_fable_reset: null,
 		unified_representative_claim: null,
+		refresh_schedule: null,
 		...overrides,
 	};
 }
@@ -89,6 +90,7 @@ export function createOAuthAccount(
 		unified_fable_utilization: null,
 		unified_fable_reset: null,
 		unified_representative_claim: null,
+		refresh_schedule: null,
 		...overrides,
 	};
 }

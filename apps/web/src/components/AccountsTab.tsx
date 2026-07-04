@@ -136,6 +136,9 @@ export function AccountsTab() {
 						onRemove={handleRemoveAccount}
 						onRename={(account) => setRenameDialog({ isOpen: true, account })}
 						onRefresh={(account) => model.refreshAccount(account.id)}
+						onSaveSchedule={(account, schedule) =>
+							model.updateRefreshSchedule(account.id, schedule)
+						}
 					/>
 				</CardContent>
 			</Card>

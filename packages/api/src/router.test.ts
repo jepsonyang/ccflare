@@ -735,6 +735,80 @@ describe("APIRouter", () => {
 		expect(unexpectedFieldResponse.status).toBe(400);
 	});
 
+	it("updates and clears the refresh schedule via PATCH", async () => {
+		const router = createRouter();
+		const { accountId } = await createApiKeyAccount(router, {
+			name: "sched-account",
+		});
+
+		const setResponse = await apiRequest(
+			router,
+			"PATCH",
+			`/api/accounts/${accountId}`,
+			{ refreshSchedule: { enabled: true, times: ["17:30", "05:00"] } },
+		);
+		expect(setResponse.status).toBe(200);
+
+		const readBack = async () =>
+			(await (
+				await apiRequest(router, "GET", "/api/accounts")
+			).json()) as Array<{
+				id: string;
+				refreshSchedule: { enabled: boolean; times: string[] } | null;
+			}>;
+
+		expect((await readBack())[0].refreshSchedule).toEqual({
+			enabled: true,
+			times: ["05:00", "17:30"],
+		});
+
+		// Clearing with null removes the schedule.
+		const clearResponse = await apiRequest(
+			router,
+			"PATCH",
+			`/api/accounts/${accountId}`,
+			{ refreshSchedule: null },
+		);
+		expect(clearResponse.status).toBe(200);
+		expect((await readBack())[0].refreshSchedule).toBeNull();
+	});
+
+	it("rejects invalid refresh schedules with 400", async () => {
+		const router = createRouter();
+		const { accountId } = await createApiKeyAccount(router, {
+			name: "sched-invalid",
+		});
+
+		const tooMany = await apiRequest(
+			router,
+			"PATCH",
+			`/api/accounts/${accountId}`,
+			{
+				refreshSchedule: {
+					enabled: true,
+					times: ["00:00", "01:00", "02:00", "03:00", "04:00", "05:00"],
+				},
+			},
+		);
+		expect(tooMany.status).toBe(400);
+
+		const duplicate = await apiRequest(
+			router,
+			"PATCH",
+			`/api/accounts/${accountId}`,
+			{ refreshSchedule: { enabled: true, times: ["05:00", "05:00"] } },
+		);
+		expect(duplicate.status).toBe(400);
+
+		const badFormat = await apiRequest(
+			router,
+			"PATCH",
+			`/api/accounts/${accountId}`,
+			{ refreshSchedule: { enabled: true, times: ["5:00"] } },
+		);
+		expect(badFormat.status).toBe(400);
+	});
+
 	it("resets stats consistently through the API", async () => {
 		const { router, dbOps } = createRouterContext();
 		const account = dbOps.createAccount({

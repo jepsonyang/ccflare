@@ -12,6 +12,7 @@ import { serve } from "bun";
 import { bootstrapRuntime, logInitialAccountStatus } from "./bootstrap-runtime";
 import { loadDashboardAssets, resetDashboardAssets } from "./dashboard-assets";
 import { createServerFetchHandler } from "./fetch-handler";
+import { startRefreshScheduler } from "./refresh-scheduler";
 import { createStartupBanner } from "./startup-banner";
 import { runStartupMaintenance } from "./startup-maintenance";
 
@@ -23,6 +24,7 @@ const lifecycleLog = new Logger("ServerLifecycle", LogLevel.INFO, {
 // Module-level server instance
 let serverInstance: ReturnType<typeof serve> | null = null;
 let stopRetentionJob: (() => void) | null = null;
+let stopRefreshScheduler: (() => void) | null = null;
 let serverStopPromise: Promise<void> | null = null;
 
 export interface ServerHandle {
@@ -39,6 +41,13 @@ function stopRetentionMaintenance(): void {
 	if (stopRetentionJob) {
 		stopRetentionJob();
 		stopRetentionJob = null;
+	}
+}
+
+function stopRefreshScheduling(): void {
+	if (stopRefreshScheduler) {
+		stopRefreshScheduler();
+		stopRefreshScheduler = null;
 	}
 }
 
@@ -73,6 +82,7 @@ async function stopServerRuntime(): Promise<void> {
 		}
 
 		stopRetentionMaintenance();
+		stopRefreshScheduling();
 
 		try {
 			await waitForProxyBackgroundTasks();
@@ -138,6 +148,7 @@ export default function startServer(
 		bootstrapRuntime(port, serverLog);
 
 	stopRetentionJob = runStartupMaintenance(config, dbOps);
+	stopRefreshScheduler = startRefreshScheduler(dbOps, config, log);
 
 	const fetchHandler = createServerFetchHandler({
 		apiRouter,

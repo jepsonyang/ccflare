@@ -49,6 +49,10 @@ export interface AccountResponse {
 		startedAt: string | null;
 		requestCount: number;
 	};
+	refreshSchedule: {
+		enabled: boolean;
+		times: string[];
+	} | null;
 }
 
 export interface APIContext {

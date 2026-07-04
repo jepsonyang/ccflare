@@ -7,6 +7,10 @@ interface AccountListProps {
 	onRemove: (account: AccountResponse) => void;
 	onRename: (account: AccountResponse) => void;
 	onRefresh: (account: AccountResponse) => Promise<unknown>;
+	onSaveSchedule: (
+		account: AccountResponse,
+		schedule: { enabled: boolean; times: string[] } | null,
+	) => Promise<unknown>;
 }
 
 export function AccountList({
@@ -15,6 +19,7 @@ export function AccountList({
 	onRemove,
 	onRename,
 	onRefresh,
+	onSaveSchedule,
 }: AccountListProps) {
 	if (!accounts || accounts.length === 0) {
 		return <p className="text-muted-foreground">No accounts configured</p>;
@@ -48,6 +53,7 @@ export function AccountList({
 					onRemove={onRemove}
 					onRename={onRename}
 					onRefresh={onRefresh}
+					onSaveSchedule={onSaveSchedule}
 				/>
 			))}
 		</div>

@@ -32,6 +32,10 @@ export function createHealthHandler(
 				strategy: config.getStrategy(),
 				providers: getProviders().filter(isAccountProvider),
 				runtime: getRuntimeHealth?.(),
+				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+				// getTimezoneOffset returns minutes behind UTC (positive west of UTC);
+				// negate so a value like UTC+8 reads as +480.
+				utcOffsetMinutes: -new Date().getTimezoneOffset(),
 			};
 
 			return jsonResponse(response);

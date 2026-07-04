@@ -28,7 +28,7 @@ const accountSelectFields = `
 	rate_limit_reset, rate_limit_status, rate_limit_remaining,
 	unified_5h_utilization, unified_5h_reset, unified_7d_utilization,
 	unified_7d_reset, unified_fable_utilization, unified_fable_reset,
-	unified_representative_claim
+	unified_representative_claim, refresh_schedule
 `;
 
 export class AccountRepository extends BaseRepository<Account> {
@@ -317,6 +317,17 @@ export class AccountRepository extends BaseRepository<Account> {
 				accountId,
 			],
 		);
+	}
+
+	/**
+	 * Persist the per-account refresh schedule. Pass null to clear it.
+	 * `scheduleJson` is the already-serialized JSON payload.
+	 */
+	updateRefreshSchedule(accountId: string, scheduleJson: string | null): void {
+		this.run(`UPDATE accounts SET refresh_schedule = ? WHERE id = ?`, [
+			scheduleJson,
+			accountId,
+		]);
 	}
 
 	pause(accountId: string): void {

@@ -14,6 +14,7 @@ import { cn } from "../../lib/utils";
 import { ProviderBadge } from "../ProviderBadge";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { RefreshScheduleEditor } from "./RefreshScheduleEditor";
 import { UsageWindows } from "./UsageWindows";
 
 function getAuthMethodLabel(authMethod: string): string {
@@ -37,6 +38,10 @@ interface AccountListItemProps {
 	onRemove: (account: AccountResponse) => void;
 	onRename: (account: AccountResponse) => void;
 	onRefresh: (account: AccountResponse) => Promise<unknown>;
+	onSaveSchedule: (
+		account: AccountResponse,
+		schedule: { enabled: boolean; times: string[] } | null,
+	) => Promise<unknown>;
 }
 
 // Keep in sync with the server-side REFRESH_MIN_INTERVAL_MS cooldown.
@@ -49,6 +54,7 @@ export function AccountListItem({
 	onRemove,
 	onRename,
 	onRefresh,
+	onSaveSchedule,
 }: AccountListItemProps) {
 	const presenter = new AccountPresenter(account);
 
@@ -147,6 +153,12 @@ export function AccountListItem({
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
+					{isOAuth && (
+						<RefreshScheduleEditor
+							account={account}
+							onSave={(schedule) => onSaveSchedule(account, schedule)}
+						/>
+					)}
 					{isOAuth && (
 						<Button
 							variant="ghost"

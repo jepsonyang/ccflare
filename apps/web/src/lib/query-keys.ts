@@ -2,6 +2,7 @@ export const queryKeys = {
 	all: ["ccflare"] as const,
 	accounts: () => [...queryKeys.all, "accounts"] as const,
 	stats: () => [...queryKeys.all, "stats"] as const,
+	health: () => [...queryKeys.all, "health"] as const,
 	analytics: (
 		timeRange?: string,
 		filters?: unknown,

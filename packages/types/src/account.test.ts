@@ -48,6 +48,7 @@ describe("toAccount", () => {
 			unified_fable_utilization: 0,
 			unified_fable_reset: now + 300_000,
 			unified_representative_claim: "7d",
+			refresh_schedule: null,
 		};
 
 		expect(getAccountRateLimitInfo(account, now)).toEqual({

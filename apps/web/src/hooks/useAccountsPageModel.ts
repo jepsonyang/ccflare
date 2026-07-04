@@ -124,6 +124,18 @@ export function useAccountsPageModel() {
 		onError: (err) => setActionError(formatError(err)),
 	});
 
+	const updateRefreshSchedule = useMutation({
+		mutationFn: (params: {
+			accountId: string;
+			schedule: { enabled: boolean; times: string[] } | null;
+		}) => api.updateRefreshSchedule(params.accountId, params.schedule),
+		onSuccess: () => {
+			setActionError(null);
+			invalidateAccounts();
+		},
+		onError: (err) => setActionError(formatError(err)),
+	});
+
 	// -- Computed --
 
 	const displayError = queryError ? formatError(queryError) : actionError;
@@ -145,6 +157,10 @@ export function useAccountsPageModel() {
 		togglePause: (account: AccountResponse) => togglePause.mutateAsync(account),
 		refreshAccount: (accountId: string) =>
 			refreshAccount.mutateAsync(accountId),
+		updateRefreshSchedule: (
+			accountId: string,
+			schedule: { enabled: boolean; times: string[] } | null,
+		) => updateRefreshSchedule.mutateAsync({ accountId, schedule }),
 		isRenaming: renameAccountMutation.isPending,
 		clearError: () => setActionError(null),
 	};

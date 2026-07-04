@@ -188,6 +188,13 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		);
 	}
 
+	updateAccountRefreshSchedule(
+		accountId: string,
+		scheduleJson: string | null,
+	): void {
+		this.accounts.updateRefreshSchedule(accountId, scheduleJson);
+	}
+
 	pauseAccount(accountId: string): void {
 		this.accounts.pause(accountId);
 	}

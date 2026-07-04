@@ -12,6 +12,15 @@ export const useAccounts = () => {
 	});
 };
 
+export const useHealth = () => {
+	return useQuery({
+		queryKey: queryKeys.health(),
+		queryFn: () => api.getHealth(),
+		// The server timezone is effectively static; no need to poll.
+		staleTime: Number.POSITIVE_INFINITY,
+	});
+};
+
 export const useStats = (refetchInterval?: number) => {
 	return useQuery({
 		queryKey: queryKeys.stats(),

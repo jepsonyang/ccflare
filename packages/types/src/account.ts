@@ -39,6 +39,112 @@ export interface AccountUsageWindows {
 	fable: AccountUsageWindow;
 }
 
+/**
+ * Per-account scheduled usage-refresh configuration. Each entry in `times` is
+ * a daily "HH:MM" in the server's local timezone; the scheduler fires an
+ * on-demand usage refresh at each. `enabled` is a master switch that keeps the
+ * configured times while suspending the schedule.
+ */
+export interface AccountRefreshSchedule {
+	enabled: boolean;
+	times: string[];
+}
+
+/** Maximum number of scheduled refresh times allowed per account. */
+export const MAX_REFRESH_SCHEDULE_TIMES = 5;
+
+const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/** True when `value` is a valid "HH:MM" 24-hour clock string. */
+export function isValidHhMm(value: string): boolean {
+	return HHMM_PATTERN.test(value);
+}
+
+export type RefreshScheduleValidation =
+	| { ok: true; value: AccountRefreshSchedule }
+	| { ok: false; error: string };
+
+/**
+ * Validate and normalize a refresh-schedule payload coming from the API/UI.
+ * Enforces: valid HH:MM format, at most MAX_REFRESH_SCHEDULE_TIMES entries, and
+ * no duplicate times. On success returns the schedule with times sorted
+ * ascending. Shared by the frontend editor and the PATCH handler so both apply
+ * identical rules.
+ */
+export function validateRefreshSchedule(
+	input: unknown,
+): RefreshScheduleValidation {
+	if (typeof input !== "object" || input === null) {
+		return { ok: false, error: "Schedule must be an object" };
+	}
+
+	const obj = input as Record<string, unknown>;
+	const enabled = obj.enabled === true;
+
+	if (!Array.isArray(obj.times)) {
+		return { ok: false, error: "Schedule times must be an array" };
+	}
+
+	const times: string[] = [];
+	for (const entry of obj.times) {
+		if (typeof entry !== "string" || !isValidHhMm(entry)) {
+			return { ok: false, error: `Invalid time: ${String(entry)}` };
+		}
+		times.push(entry);
+	}
+
+	if (times.length > MAX_REFRESH_SCHEDULE_TIMES) {
+		return {
+			ok: false,
+			error: `At most ${MAX_REFRESH_SCHEDULE_TIMES} scheduled times are allowed`,
+		};
+	}
+
+	if (new Set(times).size !== times.length) {
+		return { ok: false, error: "Duplicate time" };
+	}
+
+	times.sort();
+	return { ok: true, value: { enabled, times } };
+}
+
+/**
+ * Parse the raw `refresh_schedule` DB column into a schedule object. Returns
+ * null when unset or unparseable/invalid, so a corrupt row degrades to "no
+ * schedule" rather than throwing.
+ */
+export function parseRefreshSchedule(
+	raw: string | null | undefined,
+): AccountRefreshSchedule | null {
+	if (!raw) return null;
+	try {
+		const parsed = JSON.parse(raw);
+		const result = validateRefreshSchedule(parsed);
+		return result.ok ? result.value : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Serialize a schedule for storage in the `refresh_schedule` DB column. */
+export function serializeRefreshSchedule(
+	schedule: AccountRefreshSchedule,
+): string {
+	return JSON.stringify({ enabled: schedule.enabled, times: schedule.times });
+}
+
+/**
+ * Whether the schedule should fire a refresh at the given local "HH:MM".
+ * Only fires when enabled and the time is one of the configured entries.
+ */
+export function shouldFireRefresh(
+	schedule: AccountRefreshSchedule | null,
+	hhmm: string,
+): boolean {
+	if (!schedule?.enabled) return false;
+	return schedule.times.includes(hhmm);
+}
+
 // Domain model - used throughout the application
 export interface Account {
 	id: string;
@@ -71,6 +177,8 @@ export interface Account {
 	unified_fable_utilization: number | null;
 	unified_fable_reset: number | null;
 	unified_representative_claim: string | null;
+	// Per-account scheduled usage-refresh config; null when unconfigured.
+	refresh_schedule: AccountRefreshSchedule | null;
 }
 
 // Account creation types

@@ -1,4 +1,9 @@
-import type { Account, AccountProvider, AuthMethod } from "@ccflare/types";
+import {
+	type Account,
+	type AccountProvider,
+	type AuthMethod,
+	parseRefreshSchedule,
+} from "@ccflare/types";
 
 export interface AccountRow {
 	id: string;
@@ -29,6 +34,7 @@ export interface AccountRow {
 	unified_fable_utilization?: number | null;
 	unified_fable_reset?: number | null;
 	unified_representative_claim?: string | null;
+	refresh_schedule?: string | null;
 }
 
 export function toAccount(row: AccountRow): Account {
@@ -61,5 +67,6 @@ export function toAccount(row: AccountRow): Account {
 		unified_fable_utilization: row.unified_fable_utilization ?? null,
 		unified_fable_reset: row.unified_fable_reset ?? null,
 		unified_representative_claim: row.unified_representative_claim ?? null,
+		refresh_schedule: parseRefreshSchedule(row.refresh_schedule),
 	};
 }

@@ -9,6 +9,7 @@ import type {
 	AuthInitData,
 	AuthSessionStatusResponse,
 	CleanupResponse,
+	HealthResponse,
 	LogEvent,
 	MutationResult,
 	OAuthProvider,
@@ -75,6 +76,10 @@ class API extends HttpClient {
 
 	async getStats(): Promise<StatsWithAccounts> {
 		return this.getJson<StatsWithAccounts>("/api/stats");
+	}
+
+	async getHealth(): Promise<HealthResponse> {
+		return this.getJson<HealthResponse>("/health");
 	}
 
 	async getAccounts(): Promise<AccountResponse[]> {
@@ -284,6 +289,23 @@ class API extends HttpClient {
 		try {
 			return await this.postJson<{ skipped?: boolean; retryAfterMs?: number }>(
 				`/api/accounts/${accountId}/refresh`,
+			);
+		} catch (error) {
+			if (error instanceof HttpError) {
+				throw new Error(error.message);
+			}
+			throw error;
+		}
+	}
+
+	async updateRefreshSchedule(
+		accountId: string,
+		schedule: { enabled: boolean; times: string[] } | null,
+	): Promise<void> {
+		try {
+			await this.patchJson<MutationResult<unknown>>(
+				`/api/accounts/${accountId}`,
+				{ refreshSchedule: schedule },
 			);
 		} catch (error) {
 			if (error instanceof HttpError) {

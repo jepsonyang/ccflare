@@ -56,6 +56,35 @@ describe("toAccount", () => {
 			unified_fable_utilization: null,
 			unified_fable_reset: null,
 			unified_representative_claim: null,
+			refresh_schedule: null,
+		});
+	});
+
+	it("parses a stored refresh_schedule JSON column", () => {
+		const row: AccountRow = {
+			id: "account-2",
+			name: "Claude",
+			provider: "anthropic",
+			auth_method: "oauth",
+			base_url: null,
+			api_key: null,
+			refresh_token: "r",
+			access_token: "a",
+			expires_at: null,
+			created_at: 1,
+			last_used: null,
+			request_count: 0,
+			total_requests: 0,
+			weight: 1,
+			refresh_schedule: JSON.stringify({
+				enabled: true,
+				times: ["17:30", "05:00"],
+			}),
+		};
+
+		expect(toAccount(row).refresh_schedule).toEqual({
+			enabled: true,
+			times: ["05:00", "17:30"],
 		});
 	});
 });

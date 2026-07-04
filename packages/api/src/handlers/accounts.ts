@@ -26,6 +26,8 @@ import {
 	isAccountProvider,
 	isAuthMethod,
 	type MutationResult,
+	serializeRefreshSchedule,
+	validateRefreshSchedule,
 } from "@ccflare/types";
 import { serializeAccount } from "../serializers/account";
 import type { AccountResponse } from "../types";
@@ -48,7 +50,12 @@ const createAccountFields = new Set([
 	"base_url",
 	"baseUrl",
 ]);
-const updateAccountFields = new Set(["name", "base_url", "baseUrl"]);
+const updateAccountFields = new Set([
+	"name",
+	"base_url",
+	"baseUrl",
+	"refreshSchedule",
+]);
 function hasOwnField(body: Record<string, unknown>, field: string): boolean {
 	return Object.hasOwn(body, field);
 }
@@ -284,11 +291,29 @@ export function createAccountUpdateHandler(dbOps: DatabaseOperations) {
 			const hasName = hasOwnField(body, "name");
 			const hasBaseUrl =
 				hasOwnField(body, "base_url") || hasOwnField(body, "baseUrl");
+			const hasRefreshSchedule = hasOwnField(body, "refreshSchedule");
 
-			if (!hasName && !hasBaseUrl) {
+			if (!hasName && !hasBaseUrl && !hasRefreshSchedule) {
 				return errorResponse(
-					BadRequest("At least one of 'name' or 'base_url' is required"),
+					BadRequest(
+						"At least one of 'name', 'base_url' or 'refreshSchedule' is required",
+					),
 				);
+			}
+
+			// Validate the schedule before any write so a bad payload never persists.
+			let scheduleJson: string | null | undefined;
+			if (hasRefreshSchedule) {
+				const raw = body.refreshSchedule;
+				if (raw === null) {
+					scheduleJson = null;
+				} else {
+					const validation = validateRefreshSchedule(raw);
+					if (!validation.ok) {
+						return errorResponse(BadRequest(validation.error));
+					}
+					scheduleJson = serializeRefreshSchedule(validation.value);
+				}
 			}
 
 			let nextName = account.name;
@@ -326,6 +351,10 @@ export function createAccountUpdateHandler(dbOps: DatabaseOperations) {
 
 			if (!updatedAccount) {
 				return errorResponse(NotFound("Account not found"));
+			}
+
+			if (scheduleJson !== undefined) {
+				dbOps.updateAccountRefreshSchedule(accountId, scheduleJson);
 			}
 
 			const result: MutationResult<AccountUpdateData> = {

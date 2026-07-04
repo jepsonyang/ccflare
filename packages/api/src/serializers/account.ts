@@ -72,5 +72,11 @@ export function serializeAccount(
 				: null,
 			requestCount: session.requestCount,
 		},
+		refreshSchedule: account.refresh_schedule
+			? {
+					enabled: account.refresh_schedule.enabled,
+					times: account.refresh_schedule.times,
+				}
+			: null,
 	};
 }

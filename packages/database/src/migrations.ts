@@ -419,6 +419,13 @@ function ensureAccountRateLimitWindowColumns(db: Database): void {
 	}
 }
 
+function ensureAccountRefreshScheduleColumn(db: Database): void {
+	const columns = getTableInfo(db, "accounts");
+	if (!hasColumn(columns, "refresh_schedule")) {
+		db.run("ALTER TABLE accounts ADD COLUMN refresh_schedule TEXT");
+	}
+}
+
 function ensureAuthSessionsTable(db: Database): void {
 	db.run(`
 		CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -535,7 +542,8 @@ export function ensureSchema(db: Database): void {
 			unified_7d_reset INTEGER,
 			unified_fable_utilization REAL,
 			unified_fable_reset INTEGER,
-			unified_representative_claim TEXT
+			unified_representative_claim TEXT,
+			refresh_schedule TEXT
 		)
 	`);
 	ensureAccountsNameUniqueness(db);
@@ -616,6 +624,7 @@ export function runMigrations(db: Database): void {
 	ensureAuthSessionsTable(db);
 	ensureAccountsNameUniqueness(db);
 	ensureAccountRateLimitWindowColumns(db);
+	ensureAccountRefreshScheduleColumn(db);
 
 	// Add performance indexes
 	db.run(

@@ -131,6 +131,7 @@ describe("database schema", () => {
 				"unified_fable_utilization",
 				"unified_fable_reset",
 				"unified_representative_claim",
+				"refresh_schedule",
 			]);
 
 			const providerColumn = accountColumns.find(
