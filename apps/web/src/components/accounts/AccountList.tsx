@@ -6,6 +6,8 @@ interface AccountListProps {
 	onPauseToggle: (account: AccountResponse) => void;
 	onRemove: (account: AccountResponse) => void;
 	onRename: (account: AccountResponse) => void;
+	onEditGroups: (account: AccountResponse) => void;
+	onSelectGroup?: (groupName: string) => void;
 	onRefresh: (account: AccountResponse) => Promise<unknown>;
 	onSaveSchedule: (
 		account: AccountResponse,
@@ -18,6 +20,8 @@ export function AccountList({
 	onPauseToggle,
 	onRemove,
 	onRename,
+	onEditGroups,
+	onSelectGroup,
 	onRefresh,
 	onSaveSchedule,
 }: AccountListProps) {
@@ -52,6 +56,8 @@ export function AccountList({
 					onPauseToggle={onPauseToggle}
 					onRemove={onRemove}
 					onRename={onRename}
+					onEditGroups={onEditGroups}
+					onSelectGroup={onSelectGroup}
 					onRefresh={onRefresh}
 					onSaveSchedule={onSaveSchedule}
 				/>

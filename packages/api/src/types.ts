@@ -53,6 +53,17 @@ export interface AccountResponse {
 		enabled: boolean;
 		times: string[];
 	} | null;
+	// Names of the groups this account belongs to (empty = default pool).
+	groups: string[];
+}
+
+export interface GroupResponse {
+	id: string;
+	name: string;
+	description: string | null;
+	created: string;
+	// True for the synthetic, non-deletable default group (ungrouped pool).
+	system?: boolean;
 }
 
 export interface APIContext {

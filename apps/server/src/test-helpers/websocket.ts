@@ -264,6 +264,7 @@ export function createCodexAccount(name = "codex-oauth"): Account {
 		unified_fable_reset: null,
 		unified_representative_claim: null,
 		refresh_schedule: null,
+		groups: [],
 		rate_limited_until: null,
 		session_start: null,
 		session_request_count: 0,

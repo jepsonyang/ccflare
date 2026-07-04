@@ -7,6 +7,7 @@ import type {
 	AccountProvider,
 	AnalyticsResponse,
 	AuthMethod,
+	Group,
 	HttpMethod,
 	Request,
 	RequestSummary,
@@ -25,6 +26,7 @@ import {
 	AnalyticsRepository,
 } from "./repositories/analytics.repository";
 import { AuthSessionRepository } from "./repositories/auth-session.repository";
+import { GroupRepository } from "./repositories/group.repository";
 import {
 	type RequestData,
 	RequestRepository,
@@ -52,6 +54,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 	private authSessions: AuthSessionRepository;
 	private strategy: StrategyRepository;
 	private stats: StatsRepository;
+	private groups: GroupRepository;
 
 	constructor(dbPath?: string) {
 		const resolvedPath = dbPath ?? resolveDbPath();
@@ -78,6 +81,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		this.authSessions = new AuthSessionRepository(this.db);
 		this.strategy = new StrategyRepository(this.db);
 		this.stats = new StatsRepository(this.db);
+		this.groups = new GroupRepository(this.db);
 	}
 
 	setRuntimeConfig(runtime: RuntimeConfig): void {
@@ -107,6 +111,54 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 
 	getAvailableAccountsByProvider(provider: Account["provider"]): Account[] {
 		return this.accounts.findAvailableForProvider(provider);
+	}
+
+	getAvailableAccountsByProviderAndGroups(
+		provider: Account["provider"],
+		groupNames: string[],
+		includeDefault: boolean,
+	): Account[] {
+		return this.accounts.findAvailableForProviderAndGroups(
+			provider,
+			groupNames,
+			includeDefault,
+		);
+	}
+
+	// Group operations delegated to repository
+	getGroups(): Group[] {
+		return this.groups.listAll();
+	}
+
+	getGroup(id: string): Group | null {
+		return this.groups.findById(id);
+	}
+
+	getGroupByName(name: string): Group | null {
+		return this.groups.findByName(name);
+	}
+
+	createGroup(name: string, description: string | null): Group {
+		return this.groups.create(name, description);
+	}
+
+	updateGroup(
+		id: string,
+		data: { name?: string; description?: string | null },
+	): Group | null {
+		return this.groups.update(id, data);
+	}
+
+	deleteGroup(id: string): boolean {
+		return this.groups.delete(id);
+	}
+
+	getGroupsForAccount(accountId: string): string[] {
+		return this.groups.getGroupsForAccount(accountId);
+	}
+
+	setAccountGroups(accountId: string, groupIds: string[]): void {
+		this.groups.setAccountGroups(accountId, groupIds);
 	}
 
 	createAccount(data: CreateAccountData): Account {

@@ -1,4 +1,4 @@
-import type { AccountResponse } from "@ccflare/api";
+import type { AccountResponse, GroupResponse } from "@ccflare/api";
 import { HttpClient, HttpError, type RequestOptions } from "@ccflare/http";
 import type {
 	AccountCreateData,
@@ -184,6 +184,73 @@ class API extends HttpClient {
 
 	async resetStats(): Promise<void> {
 		await this.postJson("/api/stats/reset");
+	}
+
+	// ---- Account groups ----
+
+	async getGroups(): Promise<GroupResponse[]> {
+		return this.getJson<GroupResponse[]>("/api/groups");
+	}
+
+	async createGroup(data: {
+		name: string;
+		description?: string | null;
+	}): Promise<{ groupId: string }> {
+		try {
+			const result = await this.postJson<
+				MutationResult<{ groupId: string; name: string }>
+			>("/api/groups", data);
+			return { groupId: result.data?.groupId ?? "" };
+		} catch (error) {
+			if (error instanceof HttpError) {
+				throw new Error(error.message);
+			}
+			throw error;
+		}
+	}
+
+	async updateGroup(
+		groupId: string,
+		data: { name?: string; description?: string | null },
+	): Promise<void> {
+		try {
+			await this.patchJson<MutationResult<unknown>>(
+				`/api/groups/${groupId}`,
+				data,
+			);
+		} catch (error) {
+			if (error instanceof HttpError) {
+				throw new Error(error.message);
+			}
+			throw error;
+		}
+	}
+
+	async deleteGroup(groupId: string): Promise<void> {
+		try {
+			await this.deleteJson(`/api/groups/${groupId}`);
+		} catch (error) {
+			if (error instanceof HttpError) {
+				throw new Error(error.message);
+			}
+			throw error;
+		}
+	}
+
+	// Replace an account's group membership. `groups` is a list of group ids
+	// or names; the backend resolves and validates them.
+	async setAccountGroups(accountId: string, groups: string[]): Promise<void> {
+		try {
+			await this.patchJson<MutationResult<unknown>>(
+				`/api/accounts/${accountId}`,
+				{ groups },
+			);
+		} catch (error) {
+			if (error instanceof HttpError) {
+				throw new Error(error.message);
+			}
+			throw error;
+		}
 	}
 
 	async getLogHistory(): Promise<LogEvent[]> {

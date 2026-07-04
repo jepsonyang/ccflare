@@ -7,6 +7,11 @@ export interface RequestMeta {
 	method: HttpMethod;
 	path: string;
 	timestamp: number;
+	// Account-group names parsed from the `x-ccflare-group` request header
+	// (pipe-separated, e.g. "teamA|teamB"). When set, account selection is
+	// restricted to the union of these groups; the literal "default" includes
+	// the ungrouped pool. When unset, the default pool is used.
+	accountGroups?: string[];
 }
 
 /**
@@ -76,6 +81,22 @@ export interface AccountPauseData {
 
 export interface AccountRenameData {
 	newName: string;
+}
+
+// Account-group mutation payloads (mirror the Account* shapes above).
+export interface GroupCreateData {
+	groupId: string;
+	name: string;
+}
+
+export interface GroupUpdateData {
+	groupId: string;
+	name: string;
+	description: string | null;
+}
+
+export interface GroupDeleteData {
+	groupId: string;
 }
 
 export interface StrategyResponse {

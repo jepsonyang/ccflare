@@ -35,6 +35,9 @@ export interface AccountRow {
 	unified_fable_reset?: number | null;
 	unified_representative_claim?: string | null;
 	refresh_schedule?: string | null;
+	// Comma-joined group names from GROUP_CONCAT; null when the account is
+	// ungrouped. Parsed into Account.groups by toAccount.
+	group_names?: string | null;
 }
 
 export function toAccount(row: AccountRow): Account {
@@ -68,5 +71,6 @@ export function toAccount(row: AccountRow): Account {
 		unified_fable_reset: row.unified_fable_reset ?? null,
 		unified_representative_claim: row.unified_representative_claim ?? null,
 		refresh_schedule: parseRefreshSchedule(row.refresh_schedule),
+		groups: row.group_names ? row.group_names.split(",") : [],
 	};
 }

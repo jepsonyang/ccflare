@@ -461,7 +461,35 @@ export async function handleCompatibilityProxy(
 		);
 	}
 
+	// Account-group pinning: the upstream proxy (LiteLLM) injects an
+	// `x-ccflare-group` header per deployment to pin a caller to a specific set
+	// of accounts. Multiple groups are pipe-separated (e.g. "teamA|teamB").
+	//
+	// A comma still indicates multiple header VALUES were coalesced by the
+	// Headers API (e.g. a spoofed client header alongside the injected one) —
+	// group names are `[A-Za-z0-9_]` only, so a legitimate value never contains
+	// a comma. Reject it rather than silently leaking to the wrong pool.
+	const groupHeader = req.headers.get("x-ccflare-group");
+	if (groupHeader?.includes(",")) {
+		return buildCompatibilityError(
+			400,
+			"Multiple x-ccflare-group header values are not allowed",
+		);
+	}
+	const accountGroups = groupHeader
+		? [
+				...new Set(
+					groupHeader
+						.split("|")
+						.map((g) => g.trim())
+						.filter(Boolean),
+				),
+			]
+		: undefined;
+
 	const requestMeta = createRequestMetadata(req, url);
+	requestMeta.accountGroups =
+		accountGroups && accountGroups.length > 0 ? accountGroups : undefined;
 	requestEvents.emit("event", {
 		type: "ingress",
 		id: requestMeta.id,

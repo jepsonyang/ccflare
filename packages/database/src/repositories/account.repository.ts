@@ -28,7 +28,13 @@ const accountSelectFields = `
 	rate_limit_reset, rate_limit_status, rate_limit_remaining,
 	unified_5h_utilization, unified_5h_reset, unified_7d_utilization,
 	unified_7d_reset, unified_fable_utilization, unified_fable_reset,
-	unified_representative_claim, refresh_schedule
+	unified_representative_claim, refresh_schedule,
+	(
+		SELECT GROUP_CONCAT(g.name, ',')
+		FROM account_groups ag
+		JOIN groups g ON g.id = ag.group_id
+		WHERE ag.account_id = accounts.id
+	) AS group_names
 `;
 
 export class AccountRepository extends BaseRepository<Account> {
@@ -166,8 +172,10 @@ export class AccountRepository extends BaseRepository<Account> {
 	}
 
 	/**
-	 * Returns accounts available for routing: filters by provider and excludes
-	 * paused accounts and those currently rate-limited, all pushed into SQL.
+	 * Returns accounts available for routing in the DEFAULT pool: filters by
+	 * provider, excludes paused/rate-limited accounts, and — because groups are
+	 * "exclusive" — excludes any account that belongs to at least one group.
+	 * Grouped accounts are only reachable via findAvailableForProviderAndGroup.
 	 */
 	findAvailableForProvider(provider: Account["provider"]): Account[] {
 		const now = Date.now();
@@ -179,8 +187,66 @@ export class AccountRepository extends BaseRepository<Account> {
 			WHERE provider = ?
 				AND COALESCE(paused, 0) = 0
 				AND (rate_limited_until IS NULL OR rate_limited_until < ?)
+				AND NOT EXISTS (
+					SELECT 1 FROM account_groups ag WHERE ag.account_id = accounts.id
+				)
 		`,
 			[provider, now],
+		);
+
+		return rows.map(toAccount);
+	}
+
+	/**
+	 * Returns accounts available for routing that belong to the union of the
+	 * given groups. Same availability filter as findAvailableForProvider,
+	 * restricted to members of any of `groupNames`; when `includeDefault` is
+	 * true the ungrouped pool (accounts with no membership) is also included.
+	 * Accounts matching multiple selected groups are returned once (EXISTS).
+	 */
+	findAvailableForProviderAndGroups(
+		provider: Account["provider"],
+		groupNames: string[],
+		includeDefault: boolean,
+	): Account[] {
+		if (groupNames.length === 0 && !includeDefault) {
+			return [];
+		}
+
+		const now = Date.now();
+		const params: Array<string | number> = [provider, now];
+
+		const clauses: string[] = [];
+		if (groupNames.length > 0) {
+			const placeholders = groupNames.map(() => "?").join(", ");
+			clauses.push(
+				`EXISTS (
+					SELECT 1 FROM account_groups ag
+					JOIN groups g ON g.id = ag.group_id
+					WHERE ag.account_id = accounts.id AND g.name IN (${placeholders})
+				)`,
+			);
+			params.push(...groupNames);
+		}
+		if (includeDefault) {
+			clauses.push(
+				`NOT EXISTS (
+					SELECT 1 FROM account_groups ag WHERE ag.account_id = accounts.id
+				)`,
+			);
+		}
+
+		const rows = this.query<AccountRow>(
+			`
+			SELECT
+				${accountSelectFields}
+			FROM accounts
+			WHERE provider = ?
+				AND COALESCE(paused, 0) = 0
+				AND (rate_limited_until IS NULL OR rate_limited_until < ?)
+				AND (${clauses.join(" OR ")})
+		`,
+			params,
 		);
 
 		return rows.map(toAccount);

@@ -1,11 +1,13 @@
-import type { AccountResponse } from "@ccflare/api";
+import type { AccountResponse, GroupResponse } from "@ccflare/api";
 import { AlertCircle, Plus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAccountsPageModel } from "../hooks/useAccountsPageModel";
 import {
 	AccountAddForm,
 	AccountList,
 	DeleteConfirmationDialog,
+	EditAccountGroupsDialog,
+	GroupBar,
 	RenameAccountDialog,
 } from "./accounts";
 import { Button } from "./ui/button";
@@ -16,11 +18,20 @@ import {
 	CardHeader,
 	CardTitle,
 } from "./ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "./ui/dialog";
 
 export function AccountsTab() {
 	const model = useAccountsPageModel();
 
 	const [adding, setAdding] = useState(false);
+	const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 	const [confirmDelete, setConfirmDelete] = useState<{
 		show: boolean;
 		accountId: string;
@@ -39,6 +50,32 @@ export function AccountsTab() {
 		isOpen: false,
 		account: null,
 	});
+	const [groupsDialog, setGroupsDialog] = useState<{
+		isOpen: boolean;
+		account: AccountResponse | null;
+	}>({
+		isOpen: false,
+		account: null,
+	});
+	const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<{
+		isOpen: boolean;
+		group: GroupResponse | null;
+	}>({
+		isOpen: false,
+		group: null,
+	});
+
+	const allAccounts = useMemo(() => model.accounts ?? [], [model.accounts]);
+
+	// Single-select group filter. "default" (the system group) matches accounts
+	// with no explicit membership; a named group matches by inclusion.
+	const filteredAccounts = useMemo(() => {
+		if (selectedGroup === null) return allAccounts;
+		if (selectedGroup === "default") {
+			return allAccounts.filter((a) => a.groups.length === 0);
+		}
+		return allAccounts.filter((a) => a.groups.includes(selectedGroup));
+	}, [allAccounts, selectedGroup]);
 
 	const handleRemoveAccount = (account: AccountResponse) => {
 		setConfirmDelete({
@@ -66,6 +103,19 @@ export function AccountsTab() {
 		if (!renameDialog.account) return;
 		await model.renameAccount(renameDialog.account.id, newName);
 		setRenameDialog({ isOpen: false, account: null });
+	};
+
+	const handleRenameGroup = async (group: GroupResponse, newName: string) => {
+		await model.renameGroup(group.id, newName);
+		if (selectedGroup === group.name) setSelectedGroup(newName);
+	};
+
+	const handleConfirmDeleteGroup = async () => {
+		const group = deleteGroupConfirm.group;
+		if (!group) return;
+		await model.deleteGroup(group.id);
+		if (selectedGroup === group.name) setSelectedGroup(null);
+		setDeleteGroupConfirm({ isOpen: false, group: null });
 	};
 
 	if (model.loading) {
@@ -97,7 +147,7 @@ export function AccountsTab() {
 						<div>
 							<CardTitle>Accounts</CardTitle>
 							<CardDescription>
-								Manage provider accounts and authentication settings
+								Manage provider accounts and their group assignments
 							</CardDescription>
 						</div>
 						{!adding && (
@@ -108,7 +158,19 @@ export function AccountsTab() {
 						)}
 					</div>
 				</CardHeader>
-				<CardContent>
+				<CardContent className="space-y-4">
+					<GroupBar
+						groups={model.groups}
+						accounts={allAccounts}
+						selectedGroup={selectedGroup}
+						onSelect={setSelectedGroup}
+						onCreate={(name) => model.createGroup({ name })}
+						onRename={handleRenameGroup}
+						onDeleteRequest={(group) =>
+							setDeleteGroupConfirm({ isOpen: true, group })
+						}
+					/>
+
 					{adding && (
 						<AccountAddForm
 							onCreateApiKeyAccount={async (params) => {
@@ -130,11 +192,22 @@ export function AccountsTab() {
 						/>
 					)}
 
+					{selectedGroup !== null && (
+						<p className="text-sm text-muted-foreground">
+							Filtered by <span className="font-medium">{selectedGroup}</span> ·
+							showing {filteredAccounts.length} / {allAccounts.length}
+						</p>
+					)}
+
 					<AccountList
-						accounts={model.accounts}
+						accounts={filteredAccounts}
 						onPauseToggle={(account) => model.togglePause(account)}
 						onRemove={handleRemoveAccount}
 						onRename={(account) => setRenameDialog({ isOpen: true, account })}
+						onEditGroups={(account) =>
+							setGroupsDialog({ isOpen: true, account })
+						}
+						onSelectGroup={setSelectedGroup}
 						onRefresh={(account) => model.refreshAccount(account.id)}
 						onSaveSchedule={(account, schedule) =>
 							model.updateRefreshSchedule(account.id, schedule)
@@ -174,6 +247,55 @@ export function AccountsTab() {
 					onRename={handleConfirmRename}
 					isLoading={model.isRenaming}
 				/>
+			)}
+
+			{groupsDialog.isOpen && groupsDialog.account && (
+				<EditAccountGroupsDialog
+					isOpen={groupsDialog.isOpen}
+					account={groupsDialog.account}
+					groups={model.groups}
+					onClose={() => setGroupsDialog({ isOpen: false, account: null })}
+					onSave={(groupIds) =>
+						model.setAccountGroups(
+							(groupsDialog.account as AccountResponse).id,
+							groupIds,
+						)
+					}
+				/>
+			)}
+
+			{deleteGroupConfirm.isOpen && deleteGroupConfirm.group && (
+				<Dialog
+					open={deleteGroupConfirm.isOpen}
+					onOpenChange={(open) =>
+						!open && setDeleteGroupConfirm({ isOpen: false, group: null })
+					}
+				>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>
+								Delete group "{deleteGroupConfirm.group.name}"?
+							</DialogTitle>
+							<DialogDescription>
+								Member accounts leave this group; those left in no other group
+								return to the default pool. This does not delete any account.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<Button
+								variant="outline"
+								onClick={() =>
+									setDeleteGroupConfirm({ isOpen: false, group: null })
+								}
+							>
+								Cancel
+							</Button>
+							<Button variant="destructive" onClick={handleConfirmDeleteGroup}>
+								Delete
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
 			)}
 		</div>
 	);

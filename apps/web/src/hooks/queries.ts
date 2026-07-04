@@ -12,6 +12,69 @@ export const useAccounts = () => {
 	});
 };
 
+export const useGroups = () => {
+	return useQuery({
+		queryKey: queryKeys.groups(),
+		queryFn: () => api.getGroups(),
+	});
+};
+
+export const useCreateGroup = () => {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (data: { name: string; description?: string | null }) =>
+			api.createGroup(data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.groups() });
+		},
+	});
+};
+
+export const useUpdateGroup = () => {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			groupId,
+			data,
+		}: {
+			groupId: string;
+			data: { name?: string; description?: string | null };
+		}) => api.updateGroup(groupId, data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.groups() });
+			queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+		},
+	});
+};
+
+export const useDeleteGroup = () => {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (groupId: string) => api.deleteGroup(groupId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.groups() });
+			// Membership may have changed for affected accounts.
+			queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+		},
+	});
+};
+
+export const useSetAccountGroups = () => {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			accountId,
+			groups,
+		}: {
+			accountId: string;
+			groups: string[];
+		}) => api.setAccountGroups(accountId, groups),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+		},
+	});
+};
+
 export const useHealth = () => {
 	return useQuery({
 		queryKey: queryKeys.health(),

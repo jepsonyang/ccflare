@@ -37,6 +37,7 @@ function createAccount(): Account {
 		unified_fable_reset: null,
 		unified_representative_claim: null,
 		refresh_schedule: null,
+		groups: [],
 	};
 }
 

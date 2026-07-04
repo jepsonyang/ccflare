@@ -12,6 +12,12 @@ import {
 } from "./handlers/accounts";
 import { createAnalyticsHandler } from "./handlers/analytics";
 import { createConfigHandlers } from "./handlers/config";
+import {
+	createGroupAddHandler,
+	createGroupRemoveHandler,
+	createGroupsListHandler,
+	createGroupUpdateHandler,
+} from "./handlers/groups";
 import { createHealthHandler } from "./handlers/health";
 import { createLogsStreamHandler } from "./handlers/logs";
 import { createLogsHistoryHandler } from "./handlers/logs-history";
@@ -116,6 +122,12 @@ export class APIRouter {
 		const accountRemoveHandler = createAccountRemoveHandler(dbOps);
 		const accountRefreshHandler = createAccountRefreshHandler(dbOps, config);
 
+		// Pre-instantiate group handlers
+		const groupsListHandler = createGroupsListHandler(dbOps);
+		const groupAddHandler = createGroupAddHandler(dbOps);
+		const groupUpdateHandler = createGroupUpdateHandler(dbOps);
+		const groupRemoveHandler = createGroupRemoveHandler(dbOps);
+
 		// Pre-instantiate auth handlers
 		const authInitHandler = createAuthInitHandler(dbOps);
 		const authCompleteHandler = createAuthCompleteHandler(dbOps);
@@ -129,6 +141,8 @@ export class APIRouter {
 		this.staticHandlers.set("POST:/api/accounts", (req) =>
 			accountAddHandler(req),
 		);
+		this.staticHandlers.set("GET:/api/groups", () => groupsListHandler());
+		this.staticHandlers.set("POST:/api/groups", (req) => groupAddHandler(req));
 		this.staticHandlers.set("GET:/api/requests", (_req, url) => {
 			const limitParam = url.searchParams.get("limit");
 			const limit =
@@ -218,6 +232,15 @@ export class APIRouter {
 			"DELETE",
 			"/api/accounts/:accountId",
 			(req, _url, params) => accountRemoveHandler(req, params.accountId),
+		);
+
+		this.addDynamicRoute("PATCH", "/api/groups/:groupId", (req, _url, params) =>
+			groupUpdateHandler(req, params.groupId),
+		);
+		this.addDynamicRoute(
+			"DELETE",
+			"/api/groups/:groupId",
+			(req, _url, params) => groupRemoveHandler(req, params.groupId),
 		);
 
 		// Auth session status

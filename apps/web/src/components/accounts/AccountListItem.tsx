@@ -4,6 +4,7 @@ import {
 	AlertCircle,
 	CheckCircle,
 	Edit2,
+	Layers,
 	Pause,
 	Play,
 	RefreshCw,
@@ -14,6 +15,7 @@ import { cn } from "../../lib/utils";
 import { ProviderBadge } from "../ProviderBadge";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { AccountGroupChips } from "./AccountGroupChips";
 import { RefreshScheduleEditor } from "./RefreshScheduleEditor";
 import { UsageWindows } from "./UsageWindows";
 
@@ -37,6 +39,8 @@ interface AccountListItemProps {
 	onPauseToggle: (account: AccountResponse) => void;
 	onRemove: (account: AccountResponse) => void;
 	onRename: (account: AccountResponse) => void;
+	onEditGroups: (account: AccountResponse) => void;
+	onSelectGroup?: (groupName: string) => void;
 	onRefresh: (account: AccountResponse) => Promise<unknown>;
 	onSaveSchedule: (
 		account: AccountResponse,
@@ -53,6 +57,8 @@ export function AccountListItem({
 	onPauseToggle,
 	onRemove,
 	onRename,
+	onEditGroups,
+	onSelectGroup,
 	onRefresh,
 	onSaveSchedule,
 }: AccountListItemProps) {
@@ -111,8 +117,11 @@ export function AccountListItem({
 						<div className="flex items-center gap-2">
 							<p className="font-medium">{account.name}</p>
 							{isActive && (
-								<span className="px-2 py-0.5 text-xs font-medium bg-primary text-primary-foreground rounded-full">
-									Active
+								<span
+									className="px-2 py-0.5 text-xs font-medium bg-primary text-primary-foreground rounded-full"
+									title="Most recently used account"
+								>
+									Last used
 								</span>
 							)}
 						</div>
@@ -125,6 +134,10 @@ export function AccountListItem({
 							>
 								{getAuthMethodLabel(account.auth_method)}
 							</Badge>
+							<AccountGroupChips
+								groups={account.groups}
+								onSelect={onSelectGroup}
+							/>
 						</div>
 					</div>
 					<div className="flex items-center gap-2">
@@ -179,6 +192,14 @@ export function AccountListItem({
 						title="Rename account"
 					>
 						<Edit2 className="h-4 w-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => onEditGroups(account)}
+						title="Edit groups"
+					>
+						<Layers className="h-4 w-4" />
 					</Button>
 					<Button
 						variant="ghost"

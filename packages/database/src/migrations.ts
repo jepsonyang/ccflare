@@ -426,6 +426,39 @@ function ensureAccountRefreshScheduleColumn(db: Database): void {
 	}
 }
 
+function ensureGroupsTables(db: Database): void {
+	// Account groups: first-class entities used to pin specific upstream callers
+	// (identified by the `x-ccflare-group` header) to specific accounts.
+	db.run(`
+		CREATE TABLE IF NOT EXISTS groups (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			description TEXT,
+			created_at INTEGER NOT NULL
+		)
+	`);
+	db.run(
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_name_unique ON groups(name)`,
+	);
+
+	// Many-to-many membership. ON DELETE CASCADE keeps membership consistent when
+	// an account or group is deleted; the group repository also deletes
+	// membership explicitly in a transaction so it works without PRAGMA
+	// foreign_keys.
+	db.run(`
+		CREATE TABLE IF NOT EXISTS account_groups (
+			account_id TEXT NOT NULL,
+			group_id TEXT NOT NULL,
+			PRIMARY KEY (account_id, group_id),
+			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+		)
+	`);
+	db.run(
+		`CREATE INDEX IF NOT EXISTS idx_account_groups_group ON account_groups(group_id)`,
+	);
+}
+
 function ensureAuthSessionsTable(db: Database): void {
 	db.run(`
 		CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -625,6 +658,7 @@ export function runMigrations(db: Database): void {
 	ensureAccountsNameUniqueness(db);
 	ensureAccountRateLimitWindowColumns(db);
 	ensureAccountRefreshScheduleColumn(db);
+	ensureGroupsTables(db);
 
 	// Add performance indexes
 	db.run(

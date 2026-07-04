@@ -4,7 +4,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api";
 import { queryKeys } from "../lib/query-keys";
-import { useAccounts, useRenameAccount } from "./queries";
+import {
+	useAccounts,
+	useCreateGroup,
+	useDeleteGroup,
+	useGroups,
+	useRenameAccount,
+	useSetAccountGroups,
+	useUpdateGroup,
+} from "./queries";
 import { useApiError } from "./useApiError";
 
 /**
@@ -22,6 +30,11 @@ export function useAccountsPageModel() {
 		error: queryError,
 	} = useAccounts();
 	const renameAccountMutation = useRenameAccount();
+	const { data: groups } = useGroups();
+	const createGroupMutation = useCreateGroup();
+	const updateGroupMutation = useUpdateGroup();
+	const deleteGroupMutation = useDeleteGroup();
+	const setAccountGroupsMutation = useSetAccountGroups();
 
 	const [actionError, setActionError] = useState<string | null>(null);
 
@@ -136,6 +149,54 @@ export function useAccountsPageModel() {
 		onError: (err) => setActionError(formatError(err)),
 	});
 
+	// -- Group actions --
+
+	const createGroup = async (data: {
+		name: string;
+		description?: string | null;
+	}) => {
+		try {
+			await createGroupMutation.mutateAsync(data);
+			setActionError(null);
+		} catch (err) {
+			setActionError(formatError(err));
+			throw err;
+		}
+	};
+
+	const renameGroup = async (groupId: string, name: string) => {
+		try {
+			await updateGroupMutation.mutateAsync({ groupId, data: { name } });
+			setActionError(null);
+		} catch (err) {
+			setActionError(formatError(err));
+			throw err;
+		}
+	};
+
+	const deleteGroup = async (groupId: string) => {
+		try {
+			await deleteGroupMutation.mutateAsync(groupId);
+			setActionError(null);
+		} catch (err) {
+			setActionError(formatError(err));
+			throw err;
+		}
+	};
+
+	const setAccountGroups = async (accountId: string, groupIds: string[]) => {
+		try {
+			await setAccountGroupsMutation.mutateAsync({
+				accountId,
+				groups: groupIds,
+			});
+			setActionError(null);
+		} catch (err) {
+			setActionError(formatError(err));
+			throw err;
+		}
+	};
+
 	// -- Computed --
 
 	const displayError = queryError ? formatError(queryError) : actionError;
@@ -143,6 +204,7 @@ export function useAccountsPageModel() {
 	return {
 		// Data
 		accounts,
+		groups: groups ?? [],
 		loading,
 		error: displayError,
 
@@ -162,6 +224,10 @@ export function useAccountsPageModel() {
 			schedule: { enabled: boolean; times: string[] } | null,
 		) => updateRefreshSchedule.mutateAsync({ accountId, schedule }),
 		isRenaming: renameAccountMutation.isPending,
+		createGroup,
+		renameGroup,
+		deleteGroup,
+		setAccountGroups,
 		clearError: () => setActionError(null),
 	};
 }

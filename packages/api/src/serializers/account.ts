@@ -78,5 +78,6 @@ export function serializeAccount(
 					times: account.refresh_schedule.times,
 				}
 			: null,
+		groups: account.groups,
 	};
 }

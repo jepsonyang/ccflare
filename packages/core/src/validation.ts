@@ -173,6 +173,10 @@ export const patterns = {
 	alphanumericWithSpaces: /^[a-zA-Z0-9\s]+$/,
 	// Account name: alphanumeric with spaces, hyphens, underscores, plus @ and . for email addresses
 	accountName: /^[a-zA-Z0-9\s\-_@.+]+$/,
+	// Group name: letters, digits and underscores only. Kept symbol-free so it
+	// can be used verbatim as an `x-ccflare-group` header token and safely
+	// delimited by `|` for multi-group requests.
+	groupName: /^[a-zA-Z0-9_]+$/,
 	// Path pattern for API endpoints
 	apiPath: /^\/v1\/[a-zA-Z0-9\-_/]*$/,
 };

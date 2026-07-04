@@ -22,6 +22,7 @@ import {
 	type AccountRenameData,
 	type AccountUpdateData,
 	AUTH_METHODS,
+	DEFAULT_GROUP_NAME,
 	getProviderAuthMethod,
 	isAccountProvider,
 	isAuthMethod,
@@ -49,12 +50,14 @@ const createAccountFields = new Set([
 	"refreshToken",
 	"base_url",
 	"baseUrl",
+	"groups",
 ]);
 const updateAccountFields = new Set([
 	"name",
 	"base_url",
 	"baseUrl",
 	"refreshSchedule",
+	"groups",
 ]);
 function hasOwnField(body: Record<string, unknown>, field: string): boolean {
 	return Object.hasOwn(body, field);
@@ -88,6 +91,42 @@ function findUnexpectedField(
 	}
 
 	return null;
+}
+
+/**
+ * Resolve a `groups` payload (array of group ids or names) to a de-duplicated
+ * list of group ids. Returns an error string if the payload is malformed or any
+ * entry does not match an existing group.
+ */
+function resolveGroupIds(
+	dbOps: DatabaseOperations,
+	value: unknown,
+): { ok: true; ids: string[] } | { ok: false; error: string } {
+	if (!Array.isArray(value)) {
+		return { ok: false, error: "'groups' must be an array" };
+	}
+	const ids = new Set<string>();
+	for (const entry of value) {
+		if (typeof entry !== "string" || entry.trim() === "") {
+			return { ok: false, error: "'groups' entries must be non-empty strings" };
+		}
+		const key = entry.trim();
+		if (key.toLowerCase() === DEFAULT_GROUP_NAME) {
+			// "default" is derived from having no memberships, not an assignable
+			// group. To move an account to the default pool, pass an empty array.
+			return {
+				ok: false,
+				error:
+					"Cannot assign the default group; send an empty 'groups' array to move an account to the default pool",
+			};
+		}
+		const group = dbOps.getGroup(key) ?? dbOps.getGroupByName(key);
+		if (!group) {
+			return { ok: false, error: `Unknown group '${key}'` };
+		}
+		ids.add(group.id);
+	}
+	return { ok: true, ids: [...ids] };
 }
 
 function isDuplicateAccountNameError(error: unknown): boolean {
@@ -184,6 +223,17 @@ export function createAccountAddHandler(
 
 			const baseUrl = normalizeBaseUrl(body.base_url ?? body.baseUrl);
 
+			// Resolve optional group membership up front so a bad payload fails
+			// before the account is created.
+			let groupIds: string[] | undefined;
+			if (hasOwnField(body, "groups")) {
+				const resolution = resolveGroupIds(dbOps, body.groups);
+				if (!resolution.ok) {
+					return errorResponse(BadRequest(resolution.error));
+				}
+				groupIds = resolution.ids;
+			}
+
 			try {
 				let createdAccount: ReturnType<DatabaseOperations["createAccount"]>;
 				if (authMethod === "api_key") {
@@ -240,6 +290,10 @@ export function createAccountAddHandler(
 					});
 				}
 
+				if (groupIds !== undefined) {
+					dbOps.setAccountGroups(createdAccount.id, groupIds);
+				}
+
 				const result: MutationResult<AccountCreateData> = {
 					success: true,
 					message: `Account '${name}' added successfully`,
@@ -292,13 +346,25 @@ export function createAccountUpdateHandler(dbOps: DatabaseOperations) {
 			const hasBaseUrl =
 				hasOwnField(body, "base_url") || hasOwnField(body, "baseUrl");
 			const hasRefreshSchedule = hasOwnField(body, "refreshSchedule");
+			const hasGroups = hasOwnField(body, "groups");
 
-			if (!hasName && !hasBaseUrl && !hasRefreshSchedule) {
+			if (!hasName && !hasBaseUrl && !hasRefreshSchedule && !hasGroups) {
 				return errorResponse(
 					BadRequest(
-						"At least one of 'name', 'base_url' or 'refreshSchedule' is required",
+						"At least one of 'name', 'base_url', 'refreshSchedule' or 'groups' is required",
 					),
 				);
+			}
+
+			// Validate group membership before any write so a bad payload never
+			// persists.
+			let groupIds: string[] | undefined;
+			if (hasGroups) {
+				const resolution = resolveGroupIds(dbOps, body.groups);
+				if (!resolution.ok) {
+					return errorResponse(BadRequest(resolution.error));
+				}
+				groupIds = resolution.ids;
 			}
 
 			// Validate the schedule before any write so a bad payload never persists.
@@ -355,6 +421,10 @@ export function createAccountUpdateHandler(dbOps: DatabaseOperations) {
 
 			if (scheduleJson !== undefined) {
 				dbOps.updateAccountRefreshSchedule(accountId, scheduleJson);
+			}
+
+			if (groupIds !== undefined) {
+				dbOps.setAccountGroups(accountId, groupIds);
 			}
 
 			const result: MutationResult<AccountUpdateData> = {

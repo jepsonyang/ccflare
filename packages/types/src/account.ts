@@ -179,6 +179,29 @@ export interface Account {
 	unified_representative_claim: string | null;
 	// Per-account scheduled usage-refresh config; null when unconfigured.
 	refresh_schedule: AccountRefreshSchedule | null;
+	// Names of the groups this account belongs to. Empty when ungrouped (i.e.
+	// the account is part of the default pool). See [Group].
+	groups: string[];
+}
+
+/**
+ * Reserved name of the implicit default group. It is not stored in the
+ * database: an account "belongs to default" exactly when it has no explicit
+ * group membership. Matched case-insensitively wherever it is accepted.
+ */
+export const DEFAULT_GROUP_NAME = "default";
+
+/**
+ * An account group. Groups are first-class entities: a virtual key on the
+ * upstream proxy (LiteLLM) injects an `x-ccflare-group` header, and ccflare
+ * restricts account selection to the members of the named group. An account
+ * may belong to multiple groups (many-to-many via the `account_groups` table).
+ */
+export interface Group {
+	id: string;
+	name: string;
+	description: string | null;
+	created_at: number;
 }
 
 // Account creation types
