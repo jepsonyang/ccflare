@@ -12,38 +12,17 @@ import {
 	NotFound,
 } from "@ccflare/http";
 import { Logger } from "@ccflare/logger";
-import {
-	DEFAULT_GROUP_NAME,
-	type Group,
-	type GroupCreateData,
-	type GroupDeleteData,
-	type GroupUpdateData,
-	type MutationResult,
+import type {
+	Group,
+	GroupCreateData,
+	GroupDeleteData,
+	GroupUpdateData,
+	MutationResult,
 } from "@ccflare/types";
 import type { GroupResponse } from "../types";
 import { parseJsonObject } from "../utils/json";
 
 const log = new Logger("GroupsHandler");
-
-/**
- * The synthetic default group. Not stored in the DB — it represents the pool of
- * accounts with no explicit group membership. Non-deletable and non-editable.
- */
-const DEFAULT_GROUP: GroupResponse = {
-	id: DEFAULT_GROUP_NAME,
-	name: DEFAULT_GROUP_NAME,
-	description: "Ungrouped accounts (default pool)",
-	created: new Date(0).toISOString(),
-	system: true,
-};
-
-function isReservedGroupName(name: string): boolean {
-	return name.toLowerCase() === DEFAULT_GROUP_NAME;
-}
-
-function isDefaultGroupId(groupId: string): boolean {
-	return groupId.toLowerCase() === DEFAULT_GROUP_NAME;
-}
 
 function serializeGroup(group: Group): GroupResponse {
 	return {
@@ -85,12 +64,7 @@ function isDuplicateGroupNameError(error: unknown): boolean {
 
 export function createGroupsListHandler(dbOps: DatabaseOperations) {
 	return (): Response => {
-		// Prepend the synthetic default group so the UI can show it as a
-		// non-deletable pool alongside the real groups.
-		const response: GroupResponse[] = [
-			DEFAULT_GROUP,
-			...dbOps.getGroups().map(serializeGroup),
-		];
+		const response: GroupResponse[] = dbOps.getGroups().map(serializeGroup);
 		return jsonResponse(response);
 	};
 }
@@ -103,11 +77,6 @@ export function createGroupAddHandler(dbOps: DatabaseOperations) {
 			const name = validateGroupName(body.name);
 			if (!name) {
 				return errorResponse(BadRequest("Group name is required"));
-			}
-			if (isReservedGroupName(name)) {
-				return errorResponse(
-					BadRequest(`'${DEFAULT_GROUP_NAME}' is a reserved group name`),
-				);
 			}
 			const description = normalizeDescription(body.description);
 
@@ -140,11 +109,6 @@ export function createGroupAddHandler(dbOps: DatabaseOperations) {
 export function createGroupUpdateHandler(dbOps: DatabaseOperations) {
 	return async (req: Request, groupId: string): Promise<Response> => {
 		try {
-			if (isDefaultGroupId(groupId)) {
-				return errorResponse(
-					BadRequest("The default group cannot be modified"),
-				);
-			}
 			const body = await parseJsonObject(req);
 			const group = dbOps.getGroup(groupId);
 			if (!group) {
@@ -164,11 +128,6 @@ export function createGroupUpdateHandler(dbOps: DatabaseOperations) {
 				const name = validateGroupName(body.name);
 				if (!name) {
 					return errorResponse(BadRequest("Group name is required"));
-				}
-				if (isReservedGroupName(name)) {
-					return errorResponse(
-						BadRequest(`'${DEFAULT_GROUP_NAME}' is a reserved group name`),
-					);
 				}
 				const existing = dbOps.getGroupByName(name);
 				if (existing && existing.id !== groupId) {
@@ -215,15 +174,12 @@ export function createGroupUpdateHandler(dbOps: DatabaseOperations) {
 export function createGroupRemoveHandler(dbOps: DatabaseOperations) {
 	return async (_req: Request, groupId: string): Promise<Response> => {
 		try {
-			if (isDefaultGroupId(groupId)) {
-				return errorResponse(BadRequest("The default group cannot be deleted"));
-			}
 			const group = dbOps.getGroup(groupId);
 			if (!group) {
 				return errorResponse(NotFound("Group not found"));
 			}
-			// Deletes the group and all its membership rows in one transaction,
-			// so member accounts revert to the default pool.
+			// Deletes the group and all its membership rows in one transaction.
+			// Member accounts simply lose this tag and remain in the shared pool.
 			if (!dbOps.deleteGroup(groupId)) {
 				return errorResponse(NotFound("Group not found"));
 			}

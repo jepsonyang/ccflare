@@ -32,21 +32,16 @@ function GroupChip({
 }
 
 /**
- * Renders an account's group membership as chips. Ungrouped accounts show a
- * single muted "default" chip. When an account belongs to more than MAX_INLINE
- * groups, the overflow collapses into a "+N" popover to keep the row compact.
+ * Renders an account's group tags as chips. Accounts with no tag render
+ * nothing. When an account belongs to more than MAX_INLINE groups, the overflow
+ * collapses into a "+N" popover to keep the row compact.
  */
 export function AccountGroupChips({
 	groups,
 	onSelect,
 }: AccountGroupChipsProps) {
 	if (groups.length === 0) {
-		return (
-			<Badge variant="outline" className="gap-1 text-muted-foreground">
-				<Layers className="h-3 w-3" />
-				default
-			</Badge>
-		);
+		return null;
 	}
 
 	if (groups.length <= MAX_INLINE) {

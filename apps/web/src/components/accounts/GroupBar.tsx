@@ -21,10 +21,9 @@ interface GroupBarProps {
 
 /**
  * Compact group bar shown at the top of the Accounts card. Groups double as a
- * single-select filter; the "default" (system) group represents ungrouped
- * accounts. The trailing "+" button creates a group; the pencil button toggles
- * an edit mode in which clicking a non-system chip renames it inline and the ×
- * deletes it.
+ * single-select filter ("All" clears it). The trailing "+" button creates a
+ * group; the pencil button toggles an edit mode in which clicking a chip
+ * renames it inline and the × deletes it.
  */
 export function GroupBar({
 	groups,
@@ -74,9 +73,6 @@ export function GroupBar({
 
 	const countFor = (group: GroupResponse): number => {
 		if (!accounts) return 0;
-		if (group.system) {
-			return accounts.filter((a) => a.groups.length === 0).length;
-		}
 		return accounts.filter((a) => a.groups.includes(group.name)).length;
 	};
 
@@ -112,16 +108,18 @@ export function GroupBar({
 								<Info className="h-3.5 w-3.5" />
 							</button>
 						</PopoverTrigger>
-						<PopoverContent align="start" className="w-[28rem] max-w-[90vw] text-sm">
+						<PopoverContent
+							align="start"
+							className="w-[28rem] max-w-[90vw] text-sm"
+						>
 							<p className="font-medium">How account groups work</p>
 							<p className="mt-1 text-muted-foreground">
-								Accounts in one or more groups leave the default pool and only
-								serve requests carrying a matching{" "}
+								Groups are optional tags. A request carrying a matching{" "}
 								<code className="rounded bg-muted px-1 py-0.5 text-xs">
 									x-ccflare-group
 								</code>{" "}
-								header. Requests without the header use the default (ungrouped)
-								pool.
+								header is restricted to that group's accounts. A request without
+								the header may use any account.
 							</p>
 							<p className="mt-2 text-muted-foreground">
 								Target multiple groups by pipe-separating names, e.g.{" "}
@@ -149,9 +147,8 @@ export function GroupBar({
 
 				{groups.map((group) => {
 					const isSelected = selectedGroup === group.name;
-					// In edit mode, non-system chips become rename/delete affordances;
-					// the system "default" group stays read-only.
-					const editable = editing && !group.system;
+					// In edit mode, chips become rename/delete affordances.
+					const editable = editing;
 
 					// Inline rename: swap the chip for an input in place.
 					if (renamingId === group.id) {
@@ -278,9 +275,8 @@ export function GroupBar({
 
 			{editing && (
 				<p className="text-xs text-muted-foreground">
-					Click a group to rename it inline, or × to delete it (members with no
-					other group return to the default pool). The default group can't be
-					edited.
+					Click a group to rename it inline, or × to delete it (members simply
+					lose the tag and stay in the shared pool).
 				</p>
 			)}
 		</div>

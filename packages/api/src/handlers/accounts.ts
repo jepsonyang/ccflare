@@ -22,7 +22,6 @@ import {
 	type AccountRenameData,
 	type AccountUpdateData,
 	AUTH_METHODS,
-	DEFAULT_GROUP_NAME,
 	getProviderAuthMethod,
 	isAccountProvider,
 	isAuthMethod,
@@ -111,15 +110,6 @@ function resolveGroupIds(
 			return { ok: false, error: "'groups' entries must be non-empty strings" };
 		}
 		const key = entry.trim();
-		if (key.toLowerCase() === DEFAULT_GROUP_NAME) {
-			// "default" is derived from having no memberships, not an assignable
-			// group. To move an account to the default pool, pass an empty array.
-			return {
-				ok: false,
-				error:
-					"Cannot assign the default group; send an empty 'groups' array to move an account to the default pool",
-			};
-		}
 		const group = dbOps.getGroup(key) ?? dbOps.getGroupByName(key);
 		if (!group) {
 			return { ok: false, error: `Unknown group '${key}'` };

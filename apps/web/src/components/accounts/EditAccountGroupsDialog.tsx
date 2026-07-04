@@ -32,13 +32,8 @@ export function EditAccountGroupsDialog({
 	onClose,
 	onSave,
 }: EditAccountGroupsDialogProps) {
-	// The synthetic default group is derived (no explicit membership), so it is
-	// never a selectable toggle here.
-	const selectableGroups = groups.filter((g) => !g.system);
 	const initialSelected = new Set(
-		selectableGroups
-			.filter((g) => account.groups.includes(g.name))
-			.map((g) => g.id),
+		groups.filter((g) => account.groups.includes(g.name)).map((g) => g.id),
 	);
 	const [selected, setSelected] = useState<Set<string>>(initialSelected);
 	const [saving, setSaving] = useState(false);
@@ -73,17 +68,18 @@ export function EditAccountGroupsDialog({
 				<DialogHeader>
 					<DialogTitle>Groups for "{account.name}"</DialogTitle>
 					<DialogDescription>
-						Accounts in one or more groups leave the default pool and only serve
-						requests carrying a matching <code>x-ccflare-group</code> header.
+						Group tags restrict a request to this account only when it carries a
+						matching <code>x-ccflare-group</code> header; untagged requests may
+						use any account.
 					</DialogDescription>
 				</DialogHeader>
 				<div className="flex flex-wrap gap-2 py-4">
-					{selectableGroups.length === 0 ? (
+					{groups.length === 0 ? (
 						<p className="text-sm text-muted-foreground">
 							No groups defined yet. Create one first.
 						</p>
 					) : (
-						selectableGroups.map((group) => {
+						groups.map((group) => {
 							const isSelected = selected.has(group.id);
 							return (
 								<button

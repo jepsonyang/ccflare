@@ -62,8 +62,6 @@ export interface GroupResponse {
 	name: string;
 	description: string | null;
 	created: string;
-	// True for the synthetic, non-deletable default group (ungrouped pool).
-	system?: boolean;
 }
 
 export interface APIContext {

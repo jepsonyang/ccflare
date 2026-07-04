@@ -63,7 +63,7 @@ describe("GroupRepository", () => {
 		expect(groups.getGroupsForAccount(a.id)).toEqual(["teamB"]);
 	});
 
-	it("deleting a group removes membership so the account reverts to default pool", () => {
+	it("deleting a group removes its membership rows", () => {
 		const a = makeAccount("acc-a");
 		const g = groups.create("teamA", null);
 		groups.setAccountGroups(a.id, [g.id]);
@@ -71,7 +71,7 @@ describe("GroupRepository", () => {
 		expect(groups.delete(g.id)).toBe(true);
 		expect(groups.findById(g.id)).toBeNull();
 		expect(groups.getGroupsForAccount(a.id)).toEqual([]);
-		// Back in the default pool now that it belongs to no group.
+		// Still routable via the shared pool now that it carries no tag.
 		expect(
 			accounts.findAvailableForProvider("anthropic").map((x) => x.name),
 		).toContain("acc-a");
@@ -105,7 +105,7 @@ describe("AccountRepository group-aware selection", () => {
 		});
 	}
 
-	it("excludes grouped accounts from the default pool (exclusive groups)", () => {
+	it("includes grouped accounts in the shared pool (groups are non-exclusive)", () => {
 		const grouped = makeAccount("grouped");
 		makeAccount("ungrouped");
 		const g = groups.create("teamA", null);
@@ -113,8 +113,9 @@ describe("AccountRepository group-aware selection", () => {
 
 		const pool = accounts
 			.findAvailableForProvider("anthropic")
-			.map((a) => a.name);
-		expect(pool).toEqual(["ungrouped"]);
+			.map((a) => a.name)
+			.sort();
+		expect(pool).toEqual(["grouped", "ungrouped"]);
 	});
 
 	it("returns only members when filtering by group", () => {
@@ -126,13 +127,13 @@ describe("AccountRepository group-aware selection", () => {
 		groups.setAccountGroups(b.id, [g.id]);
 
 		const members = accounts
-			.findAvailableForProviderAndGroups("anthropic", ["teamA"], false)
+			.findAvailableForProviderAndGroups("anthropic", ["teamA"])
 			.map((x) => x.name)
 			.sort();
 		expect(members).toEqual(["acc-a", "acc-b"]);
 	});
 
-	it("returns the union of multiple groups, deduped, optionally with default", () => {
+	it("returns the union of multiple groups, deduped", () => {
 		const a = makeAccount("acc-a");
 		const b = makeAccount("acc-b");
 		const both = makeAccount("acc-both");
@@ -143,34 +144,22 @@ describe("AccountRepository group-aware selection", () => {
 		groups.setAccountGroups(b.id, [gB.id]);
 		groups.setAccountGroups(both.id, [gA.id, gB.id]);
 
-		// Union of teamA + teamB, acc-both counted once.
+		// Union of teamA + teamB, acc-both counted once; ungrouped excluded.
 		expect(
 			accounts
-				.findAvailableForProviderAndGroups(
-					"anthropic",
-					["teamA", "teamB"],
-					false,
-				)
+				.findAvailableForProviderAndGroups("anthropic", ["teamA", "teamB"])
 				.map((x) => x.name)
 				.sort(),
 		).toEqual(["acc-a", "acc-b", "acc-both"]);
-
-		// teamA + default pool.
-		expect(
-			accounts
-				.findAvailableForProviderAndGroups("anthropic", ["teamA"], true)
-				.map((x) => x.name)
-				.sort(),
-		).toEqual(["acc-a", "acc-both", "acc-ungrouped"]);
 	});
 
 	it("returns no accounts for an unknown group and for an empty selection", () => {
 		makeAccount("acc-a");
 		expect(
-			accounts.findAvailableForProviderAndGroups("anthropic", ["nope"], false),
+			accounts.findAvailableForProviderAndGroups("anthropic", ["nope"]),
 		).toEqual([]);
-		expect(
-			accounts.findAvailableForProviderAndGroups("anthropic", [], false),
-		).toEqual([]);
+		expect(accounts.findAvailableForProviderAndGroups("anthropic", [])).toEqual(
+			[],
+		);
 	});
 });

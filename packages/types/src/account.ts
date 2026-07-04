@@ -179,17 +179,11 @@ export interface Account {
 	unified_representative_claim: string | null;
 	// Per-account scheduled usage-refresh config; null when unconfigured.
 	refresh_schedule: AccountRefreshSchedule | null;
-	// Names of the groups this account belongs to. Empty when ungrouped (i.e.
-	// the account is part of the default pool). See [Group].
+	// Names of the groups (tags) this account belongs to. Empty when the account
+	// carries no group tag; it is still part of the shared pool either way. See
+	// [Group].
 	groups: string[];
 }
-
-/**
- * Reserved name of the implicit default group. It is not stored in the
- * database: an account "belongs to default" exactly when it has no explicit
- * group membership. Matched case-insensitively wherever it is accepted.
- */
-export const DEFAULT_GROUP_NAME = "default";
 
 /**
  * An account group. Groups are first-class entities: a virtual key on the

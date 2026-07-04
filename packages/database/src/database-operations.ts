@@ -116,12 +116,10 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 	getAvailableAccountsByProviderAndGroups(
 		provider: Account["provider"],
 		groupNames: string[],
-		includeDefault: boolean,
 	): Account[] {
 		return this.accounts.findAvailableForProviderAndGroups(
 			provider,
 			groupNames,
-			includeDefault,
 		);
 	}
 

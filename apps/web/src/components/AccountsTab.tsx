@@ -67,13 +67,10 @@ export function AccountsTab() {
 
 	const allAccounts = useMemo(() => model.accounts ?? [], [model.accounts]);
 
-	// Single-select group filter. "default" (the system group) matches accounts
-	// with no explicit membership; a named group matches by inclusion.
+	// Single-select group filter. null shows all accounts; a named group matches
+	// by membership inclusion.
 	const filteredAccounts = useMemo(() => {
 		if (selectedGroup === null) return allAccounts;
-		if (selectedGroup === "default") {
-			return allAccounts.filter((a) => a.groups.length === 0);
-		}
 		return allAccounts.filter((a) => a.groups.includes(selectedGroup));
 	}, [allAccounts, selectedGroup]);
 
@@ -277,8 +274,8 @@ export function AccountsTab() {
 								Delete group "{deleteGroupConfirm.group.name}"?
 							</DialogTitle>
 							<DialogDescription>
-								Member accounts leave this group; those left in no other group
-								return to the default pool. This does not delete any account.
+								Member accounts lose this group tag and stay in the shared pool.
+								This does not delete any account.
 							</DialogDescription>
 						</DialogHeader>
 						<DialogFooter>

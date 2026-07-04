@@ -172,10 +172,11 @@ export class AccountRepository extends BaseRepository<Account> {
 	}
 
 	/**
-	 * Returns accounts available for routing in the DEFAULT pool: filters by
-	 * provider, excludes paused/rate-limited accounts, and — because groups are
-	 * "exclusive" — excludes any account that belongs to at least one group.
-	 * Grouped accounts are only reachable via findAvailableForProviderAndGroup.
+	 * Returns every account available for routing without any group filter:
+	 * filters by provider and excludes paused/rate-limited accounts. Group
+	 * membership no longer removes an account from this pool — a request with no
+	 * `x-ccflare-group` header may use any account. Groups act as opt-in subsets
+	 * reachable via findAvailableForProviderAndGroups.
 	 */
 	findAvailableForProvider(provider: Account["provider"]): Account[] {
 		const now = Date.now();
@@ -187,9 +188,6 @@ export class AccountRepository extends BaseRepository<Account> {
 			WHERE provider = ?
 				AND COALESCE(paused, 0) = 0
 				AND (rate_limited_until IS NULL OR rate_limited_until < ?)
-				AND NOT EXISTS (
-					SELECT 1 FROM account_groups ag WHERE ag.account_id = accounts.id
-				)
 		`,
 			[provider, now],
 		);
@@ -200,41 +198,21 @@ export class AccountRepository extends BaseRepository<Account> {
 	/**
 	 * Returns accounts available for routing that belong to the union of the
 	 * given groups. Same availability filter as findAvailableForProvider,
-	 * restricted to members of any of `groupNames`; when `includeDefault` is
-	 * true the ungrouped pool (accounts with no membership) is also included.
-	 * Accounts matching multiple selected groups are returned once (EXISTS).
+	 * restricted to members of any of `groupNames`. Accounts matching multiple
+	 * selected groups are returned once (EXISTS). An empty selection matches
+	 * nothing.
 	 */
 	findAvailableForProviderAndGroups(
 		provider: Account["provider"],
 		groupNames: string[],
-		includeDefault: boolean,
 	): Account[] {
-		if (groupNames.length === 0 && !includeDefault) {
+		if (groupNames.length === 0) {
 			return [];
 		}
 
 		const now = Date.now();
-		const params: Array<string | number> = [provider, now];
-
-		const clauses: string[] = [];
-		if (groupNames.length > 0) {
-			const placeholders = groupNames.map(() => "?").join(", ");
-			clauses.push(
-				`EXISTS (
-					SELECT 1 FROM account_groups ag
-					JOIN groups g ON g.id = ag.group_id
-					WHERE ag.account_id = accounts.id AND g.name IN (${placeholders})
-				)`,
-			);
-			params.push(...groupNames);
-		}
-		if (includeDefault) {
-			clauses.push(
-				`NOT EXISTS (
-					SELECT 1 FROM account_groups ag WHERE ag.account_id = accounts.id
-				)`,
-			);
-		}
+		const placeholders = groupNames.map(() => "?").join(", ");
+		const params: Array<string | number> = [provider, now, ...groupNames];
 
 		const rows = this.query<AccountRow>(
 			`
@@ -244,7 +222,11 @@ export class AccountRepository extends BaseRepository<Account> {
 			WHERE provider = ?
 				AND COALESCE(paused, 0) = 0
 				AND (rate_limited_until IS NULL OR rate_limited_until < ?)
-				AND (${clauses.join(" OR ")})
+				AND EXISTS (
+					SELECT 1 FROM account_groups ag
+					JOIN groups g ON g.id = ag.group_id
+					WHERE ag.account_id = accounts.id AND g.name IN (${placeholders})
+				)
 		`,
 			params,
 		);
