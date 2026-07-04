@@ -38,6 +38,16 @@ function sortedTimes(times: string[]): string[] {
 	return [...times].sort();
 }
 
+/**
+ * Zero-pad a loosely-typed "H:M" into "HH:MM" so manual entry like "7:0"
+ * becomes "07:00". Leaves anything that isn't digits:digits untouched.
+ */
+function normalizeTimeInput(value: string): string {
+	const match = value.trim().match(/^(\d{1,2}):(\d{1,2})$/);
+	if (!match) return value;
+	return `${match[1].padStart(2, "0")}:${match[2].padStart(2, "0")}`;
+}
+
 /** Format a UTC offset in minutes as "UTC+8" / "UTC-3:30". */
 function formatUtcOffset(minutes: number): string {
 	const sign = minutes < 0 ? "-" : "+";
@@ -187,11 +197,17 @@ export function RefreshScheduleEditor({
 							return (
 								<div key={index} className="flex items-center gap-2">
 									<Input
-										type="time"
+										type="text"
+										inputMode="numeric"
+										placeholder="HH:MM"
+										maxLength={5}
 										value={value}
 										onChange={(e) => updateTime(index, e.target.value)}
+										onBlur={(e) =>
+											updateTime(index, normalizeTimeInput(e.target.value))
+										}
 										className={cn(
-											"h-8",
+											"h-8 tabular-nums",
 											(invalid || duplicate) && "border-destructive",
 										)}
 									/>
