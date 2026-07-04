@@ -83,7 +83,7 @@ describe("handleCompatibilityProxy", () => {
 		expect(response.status).toBe(400);
 	});
 
-	it("returns 503 when the requested family has no usable accounts", async () => {
+	it("returns 400 when the requested family has no usable accounts", async () => {
 		const response = await handleCompatibilityProxy(
 			new Request("http://localhost:8080/v1/ccflare/openai/chat/completions", {
 				method: "POST",
@@ -101,7 +101,8 @@ describe("handleCompatibilityProxy", () => {
 			throw new Error("Expected a response");
 		}
 
-		expect(response.status).toBe(503);
+		// 400 (not 503) so the client SDK does not auto-retry an exhausted pool.
+		expect(response.status).toBe(400);
 	});
 
 	it("prefers codex ahead of openai for the public openai family", async () => {

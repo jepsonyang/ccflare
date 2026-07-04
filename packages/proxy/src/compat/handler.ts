@@ -514,8 +514,11 @@ export async function handleCompatibilityProxy(
 		}
 	}
 
+	// Return 400 (not 503) so the client's SDK does not treat it as a transient
+	// 5xx and auto-retry: every account is exhausted, so an immediate retry only
+	// hammers a pool that cannot serve the request until quotas reset.
 	return buildCompatibilityError(
-		503,
+		400,
 		`No usable accounts available for the '${model.family}' compatibility family`,
 	);
 }
