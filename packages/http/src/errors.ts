@@ -35,6 +35,9 @@ export const Conflict = (message: string, details?: unknown) =>
 export const InternalServerError = (message: string, details?: unknown) =>
 	new HttpError(500, message, details);
 
+export const BadGateway = (message: string, details?: unknown) =>
+	new HttpError(502, message, details);
+
 export const ServiceUnavailable = (message: string, details?: unknown) =>
 	new HttpError(503, message, details);
 

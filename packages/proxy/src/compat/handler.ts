@@ -1,5 +1,6 @@
 import { requestEvents } from "@ccflare/core";
 import {
+	BadGateway,
 	BadRequest,
 	errorResponse,
 	ServiceUnavailable,
@@ -48,10 +49,37 @@ type CompatibilityExecutionPlan = {
 	transformResponse: (response: Response) => Promise<Response>;
 };
 
-function buildCompatibilityError(status: 400 | 503, message: string): Response {
-	return errorResponse(
-		status === 400 ? BadRequest(message) : ServiceUnavailable(message),
-	);
+function buildCompatibilityError(
+	status: 400 | 502 | 503,
+	message: string,
+): Response {
+	const factory =
+		status === 400
+			? BadRequest
+			: status === 502
+				? BadGateway
+				: ServiceUnavailable;
+	return errorResponse(factory(message));
+}
+
+// How long to wait before retrying a connection-level fetch failure in-process.
+// Flaps (NAT/proxy tunnel rebuilds) usually recover within a few hundred ms; a
+// single short-delay retry papers over most of them without duplicating the
+// slow exponential backoff the client SDK already performs on a 502.
+const NETWORK_RETRY_DELAY_MS = 250;
+
+/**
+ * A connection-level failure where `fetch()` threw before any response headers
+ * arrived (e.g. "socket connection was closed unexpectedly"), and the one
+ * in-process retry failed the same way. The request never completed a round
+ * trip, so it is safe for the caller to retry on another account or surface a
+ * retryable 502 — unlike errors thrown after a response was received.
+ */
+class UpstreamConnectionError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "UpstreamConnectionError";
+	}
 }
 
 function buildResolvedContext(
@@ -153,6 +181,53 @@ async function fetchUpstream(
 		headers,
 		body: requestBody,
 	});
+}
+
+/**
+ * `fetchUpstream` with a single in-process retry for connection-level errors.
+ *
+ * Only the `fetch()` call itself is retried: when it throws, no response
+ * headers were received, so the request cannot have been processed (or billed)
+ * upstream. Failures after a response arrives are never retried here. If the
+ * retry also fails, throws `UpstreamConnectionError` so the caller can count
+ * it toward a retryable 502 instead of the exhausted-pool 400.
+ */
+async function fetchUpstreamWithRetry(
+	req: Request,
+	url: URL,
+	account: Parameters<typeof getValidAccessToken>[0] | null,
+	requestContext: ResolvedProxyContext,
+	requestBody: string,
+	isStreaming: boolean,
+): Promise<Response> {
+	try {
+		return await fetchUpstream(
+			req,
+			url,
+			account,
+			requestContext,
+			requestBody,
+			isStreaming,
+		);
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		log.warn(
+			`Upstream ${requestContext.providerName}/${account?.name ?? "?"} connection error, retrying in ${NETWORK_RETRY_DELAY_MS}ms: ${detail}`,
+		);
+		await Bun.sleep(NETWORK_RETRY_DELAY_MS);
+		try {
+			return await fetchUpstream(
+				req,
+				url,
+				account,
+				requestContext,
+				requestBody,
+				isStreaming,
+			);
+		} catch {
+			throw new UpstreamConnectionError(detail);
+		}
+	}
 }
 
 const identityTransform = async (response: Response) => response;
@@ -271,9 +346,15 @@ type TryProviderFamilyOptions = {
 	stripped: StrippedModel;
 };
 
+type ProviderFamilyResult = {
+	response: Response | null;
+	/** Attempts that died on a connection-level error (fetch threw twice). */
+	networkErrorCount: number;
+};
+
 async function tryProviderFamily(
 	options: TryProviderFamilyOptions,
-): Promise<Response | null> {
+): Promise<ProviderFamilyResult> {
 	const {
 		req,
 		url,
@@ -299,10 +380,11 @@ async function tryProviderFamily(
 	const accounts = selectAccountsForRequest(requestMeta, requestContext);
 
 	if (accounts.length === 0) {
-		return null;
+		return { response: null, networkErrorCount: 0 };
 	}
 
 	let lastErrorResponse: Response | null = null;
+	let networkErrorCount = 0;
 	for (let attempt = 0; attempt < accounts.length; attempt += 1) {
 		const account = accounts[attempt];
 		try {
@@ -318,7 +400,7 @@ async function tryProviderFamily(
 
 			const upstreamRequestStartedAt = Date.now();
 			const isStreaming = upstreamBody.stream === true;
-			const response = await fetchUpstream(
+			const response = await fetchUpstreamWithRetry(
 				req,
 				url,
 				requestAccount,
@@ -360,11 +442,14 @@ async function tryProviderFamily(
 				log.warn(
 					`Upstream ${actualProvider}/${account.name} ${response.status} request-level rejection: ${errorBody.slice(0, 500)}`,
 				);
-				return new Response(errorBody, {
-					status: 400,
-					statusText: "Bad Request",
-					headers: sanitizeProxyHeaders(response.headers),
-				});
+				return {
+					response: new Response(errorBody, {
+						status: 400,
+						statusText: "Bad Request",
+						headers: sanitizeProxyHeaders(response.headers),
+					}),
+					networkErrorCount,
+				};
 			}
 
 			if (!response.ok) {
@@ -387,7 +472,7 @@ async function tryProviderFamily(
 			}
 
 			const transformedResponse = await plan.transformResponse(response);
-			return await forwardToClient(
+			const forwarded = await forwardToClient(
 				{
 					requestId: requestMeta.id,
 					method: requestMeta.method,
@@ -405,7 +490,11 @@ async function tryProviderFamily(
 				},
 				requestContext,
 			);
+			return { response: forwarded, networkErrorCount };
 		} catch (error) {
+			if (error instanceof UpstreamConnectionError) {
+				networkErrorCount += 1;
+			}
 			const detail = error instanceof Error ? error.message : String(error);
 			log.error(
 				`Compatibility request failed for ${actualProvider}/${account.name}: ${detail}`,
@@ -413,7 +502,7 @@ async function tryProviderFamily(
 		}
 	}
 
-	return lastErrorResponse;
+	return { response: lastErrorResponse, networkErrorCount };
 }
 
 export async function handleCompatibilityProxy(
@@ -497,8 +586,9 @@ export async function handleCompatibilityProxy(
 		method: requestMeta.method,
 		path: requestMeta.path,
 	});
+	let totalNetworkErrors = 0;
 	for (const actualProvider of COMPAT_PROVIDER_ORDER[model.family]) {
-		const response = await tryProviderFamily({
+		const { response, networkErrorCount } = await tryProviderFamily({
 			req,
 			url,
 			requestMeta,
@@ -509,14 +599,24 @@ export async function handleCompatibilityProxy(
 			route: route.kind,
 			stripped: model,
 		});
+		totalNetworkErrors += networkErrorCount;
 		if (response) {
 			return response;
 		}
 	}
 
-	// Return 400 (not 503) so the client's SDK does not treat it as a transient
-	// 5xx and auto-retry: every account is exhausted, so an immediate retry only
-	// hammers a pool that cannot serve the request until quotas reset.
+	// Connection-level failures (accounts were fine, the network flaked) return
+	// a retryable 502 so client SDKs back off and retry automatically.
+	if (totalNetworkErrors > 0) {
+		return buildCompatibilityError(
+			502,
+			`Upstream connection failed after ${totalNetworkErrors} attempt(s); please retry`,
+		);
+	}
+
+	// Return 400 (not 5xx) so the client's SDK does not treat it as a transient
+	// error and auto-retry: every account is exhausted, so an immediate retry
+	// only hammers a pool that cannot serve the request until quotas reset.
 	return buildCompatibilityError(
 		400,
 		`No usable accounts available for the '${model.family}' compatibility family`,

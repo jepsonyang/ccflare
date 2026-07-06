@@ -105,6 +105,133 @@ describe("handleCompatibilityProxy", () => {
 		expect(response.status).toBe(400);
 	});
 
+	it("retries the same account once after a connection-level fetch error", async () => {
+		let calls = 0;
+		globalThis.fetch = Object.assign(
+			async () => {
+				calls += 1;
+				if (calls === 1) {
+					throw new Error("The socket connection was closed unexpectedly");
+				}
+				return new Response(
+					JSON.stringify({
+						id: "msg_test",
+						type: "message",
+						role: "assistant",
+						model: "claude-sonnet-4",
+						content: [{ type: "text", text: "ok" }],
+						stop_reason: "end_turn",
+						stop_sequence: null,
+						usage: { input_tokens: 10, output_tokens: 2 },
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				);
+			},
+			{ preconnect: originalFetch.preconnect },
+		) as typeof fetch;
+
+		const response = await handleCompatibilityProxy(
+			new Request("http://localhost:8080/v1/ccflare/anthropic/messages", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					model: "anthropic/claude-sonnet-4",
+					max_tokens: 32,
+					messages: [{ role: "user", content: "hi" }],
+				}),
+			}),
+			new URL("http://localhost:8080/v1/ccflare/anthropic/messages"),
+			createProxyContext({
+				"claude-code": [createOAuthAccount("claude-code")],
+			}),
+		);
+
+		expect(response?.status).toBe(200);
+		expect(calls).toBe(2);
+	});
+
+	it("returns a retryable 502 when every attempt fails at the connection level", async () => {
+		let calls = 0;
+		globalThis.fetch = Object.assign(
+			async () => {
+				calls += 1;
+				throw new Error("The socket connection was closed unexpectedly");
+			},
+			{ preconnect: originalFetch.preconnect },
+		) as typeof fetch;
+
+		const response = await handleCompatibilityProxy(
+			new Request("http://localhost:8080/v1/ccflare/anthropic/messages", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					model: "anthropic/claude-sonnet-4",
+					max_tokens: 32,
+					messages: [{ role: "user", content: "hi" }],
+				}),
+			}),
+			new URL("http://localhost:8080/v1/ccflare/anthropic/messages"),
+			createProxyContext({
+				"claude-code": [createOAuthAccount("claude-code")],
+			}),
+		);
+
+		// 502 (not 400): the accounts are fine, the network flaked, so the
+		// client SDK should back off and retry.
+		expect(response?.status).toBe(502);
+		// One in-process retry on the single account: two fetch attempts total.
+		expect(calls).toBe(2);
+	});
+
+	it("fails over to the next account after the in-process retry also fails", async () => {
+		let calls = 0;
+		globalThis.fetch = Object.assign(
+			async () => {
+				calls += 1;
+				// Account 1: both the initial attempt and the retry die.
+				if (calls <= 2) {
+					throw new Error("The socket connection was closed unexpectedly");
+				}
+				return new Response(
+					JSON.stringify({
+						id: "msg_test",
+						type: "message",
+						role: "assistant",
+						model: "claude-sonnet-4",
+						content: [{ type: "text", text: "ok" }],
+						stop_reason: "end_turn",
+						stop_sequence: null,
+						usage: { input_tokens: 10, output_tokens: 2 },
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				);
+			},
+			{ preconnect: originalFetch.preconnect },
+		) as typeof fetch;
+
+		const response = await handleCompatibilityProxy(
+			new Request("http://localhost:8080/v1/ccflare/anthropic/messages", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					model: "anthropic/claude-sonnet-4",
+					max_tokens: 32,
+					messages: [{ role: "user", content: "hi" }],
+				}),
+			}),
+			new URL("http://localhost:8080/v1/ccflare/anthropic/messages"),
+			createProxyContext({
+				"claude-code": [
+					createOAuthAccount("claude-code", { id: "account-1", name: "one" }),
+					createOAuthAccount("claude-code", { id: "account-2", name: "two" }),
+				],
+			}),
+		);
+
+		expect(response?.status).toBe(200);
+		expect(calls).toBe(3);
+	});
+
 	it("prefers codex ahead of openai for the public openai family", async () => {
 		const seenUrls: string[] = [];
 		globalThis.fetch = Object.assign(
