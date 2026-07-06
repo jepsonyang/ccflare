@@ -96,8 +96,8 @@ describe("AnthropicProvider", () => {
 			status: 200,
 			headers: {
 				"anthropic-ratelimit-unified-status": "allowed",
-				// 5h given as 0-100 percentage, 7d given as 0-1 fraction
-				"anthropic-ratelimit-unified-5h-utilization": "42",
+				// Anthropic reports utilization as a 0-1 fraction (0.42 = 42%).
+				"anthropic-ratelimit-unified-5h-utilization": "0.42",
 				"anthropic-ratelimit-unified-5h-reset": String(fiveHourReset),
 				"anthropic-ratelimit-unified-7d-utilization": "0.85",
 				"anthropic-ratelimit-unified-7d-reset": String(sevenDayReset),
@@ -111,6 +111,21 @@ describe("AnthropicProvider", () => {
 		expect(info.sevenDayUtilization).toBeCloseTo(85);
 		expect(info.sevenDayResetTime).toBe(sevenDayReset * 1000);
 		expect(info.representativeClaim).toBe("7d");
+	});
+
+	it("clamps an exhausted (>100%) window down to 100", () => {
+		const response = new Response("{}", {
+			status: 429,
+			headers: {
+				"anthropic-ratelimit-unified-status": "rejected",
+				// Exhausted 7d window: fraction exceeds 1.0 (1.01 = 101%).
+				"anthropic-ratelimit-unified-7d-utilization": "1.01",
+				"anthropic-ratelimit-unified-representative-claim": "seven_day",
+			},
+		});
+
+		const info = provider.parseRateLimit(response);
+		expect(info.sevenDayUtilization).toBe(100);
 	});
 
 	it("parses the Fable (7d_oi) window and normalizes -0.0 to 0", () => {

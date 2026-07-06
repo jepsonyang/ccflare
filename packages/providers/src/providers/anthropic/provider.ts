@@ -23,14 +23,18 @@ const DEFAULT_BASE_URL = getProviderDefaultBaseUrl(PROVIDER_NAME);
 
 /**
  * Normalize a unified utilization header to a 0-100 percentage.
- * Accepts both fractional (0.0-1.0) and percentage (0-100) scales.
+ *
+ * Anthropic reports these windows on a fractional scale (0.0-1.0, e.g. 0.42 =
+ * 42%); when a window is exhausted the value goes past 1.0 (e.g. 1.01 = 101%,
+ * corroborated by the sibling `-surpassed-threshold: 1.0` header). We always
+ * multiply by 100 and clamp overage down to 100, matching Claude's own console
+ * which caps a maxed-out window at "100%".
  */
 function parseUtilization(raw: string | null): number | undefined {
 	if (raw == null) return undefined;
 	const n = Number(raw);
 	if (!Number.isFinite(n)) return undefined;
-	const pct = n <= 1 ? n * 100 : n;
-	return Math.min(100, Math.max(0, pct));
+	return Math.min(100, Math.max(0, n * 100));
 }
 
 /** Convert a unix-seconds reset header to ms epoch. */
