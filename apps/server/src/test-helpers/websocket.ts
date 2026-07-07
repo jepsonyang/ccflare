@@ -297,11 +297,6 @@ export function createInMemoryProxyContext(
 		},
 		runtime: {
 			clientId: "test-client",
-			retry: {
-				attempts: 1,
-				delayMs: 0,
-				backoff: 1,
-			},
 			sessionDurationMs: 0,
 			port: 8080,
 		},

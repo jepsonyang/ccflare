@@ -109,9 +109,6 @@ PORT=8080
 CLIENT_ID=your-client-id
 
 # Retry configuration
-RETRY_ATTEMPTS=3
-RETRY_DELAY_MS=1000
-RETRY_BACKOFF=2
 ```
 
 ### Configuration File
@@ -123,10 +120,7 @@ The configuration file is automatically created at `~/.config/ccflare/ccflare.js
     "lb_strategy": "session",
     "session_duration_ms": 18000000,
     "port": 8080,
-    "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-    "retry_attempts": 3,
-    "retry_delay_ms": 1000,
-    "retry_backoff": 2
+    "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 }
 ```
 

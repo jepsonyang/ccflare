@@ -409,9 +409,6 @@ Or fallback to:
 {
   "lb_strategy": "session",
   "client_id": "optional-custom-client-id",
-  "retry_attempts": 3,
-  "retry_delay_ms": 1000,
-  "retry_backoff": 2,
   "session_duration_ms": 18000000,
   "port": 8080
 }
@@ -444,9 +441,6 @@ The SQLite database follows the same directory structure:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `RETRY_ATTEMPTS` | Number of retry attempts | 3 |
-| `RETRY_DELAY_MS` | Initial retry delay (ms) | 1000 |
-| `RETRY_BACKOFF` | Exponential backoff multiplier | 2 |
 
 ### Session Management
 

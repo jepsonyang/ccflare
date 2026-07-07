@@ -51,9 +51,6 @@ The configuration file is stored at:
 {
   "lb_strategy": "session",
   "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-  "retry_attempts": 3,
-  "retry_delay_ms": 1000,
-  "retry_backoff": 2,
   "session_duration_ms": 18000000,
   "port": 8080,
   "dashboard_base_path": ""
@@ -68,9 +65,6 @@ The configuration file is stored at:
 |-------|------|---------|-------------|
 | `lb_strategy` | string | `"session"` | Load balancing strategy. Only `"session"` is supported (using other strategies risks account bans) |
 | `client_id` | string | `"9d1c250a-e61b-44d9-88ed-5944d1962f5e"` | OAuth client ID for authentication |
-| `retry_attempts` | number | `3` | Maximum number of retry attempts for failed requests |
-| `retry_delay_ms` | number | `1000` | Initial delay in milliseconds between retry attempts |
-| `retry_backoff` | number | `2` | Exponential backoff multiplier for retry delays |
 | `session_duration_ms` | number | `18000000` (5 hours) | Session persistence duration in milliseconds |
 | `port` | number | `8080` | HTTP server port |
 | `dashboard_base_path` | string | `""` | Path prefix the **dashboard** (and its management API/SSE) is mounted under. Empty = served at the root. See [Dashboard Base Path](#dashboard-base-path) |
@@ -125,9 +119,6 @@ location /ccflare/ {
 |---------------------|--------------|------|---------|
 | `LB_STRATEGY` | `lb_strategy` | string | `LB_STRATEGY=session` |
 | `CLIENT_ID` | `client_id` | string | `CLIENT_ID=your-client-id` |
-| `RETRY_ATTEMPTS` | `retry_attempts` | number | `RETRY_ATTEMPTS=5` |
-| `RETRY_DELAY_MS` | `retry_delay_ms` | number | `RETRY_DELAY_MS=2000` |
-| `RETRY_BACKOFF` | `retry_backoff` | number | `RETRY_BACKOFF=1.5` |
 | `SESSION_DURATION_MS` | `session_duration_ms` | number | `SESSION_DURATION_MS=3600000` |
 | `PORT` | `port` | number | `PORT=3000` |
 | `DASHBOARD_BASE_PATH` | `dashboard_base_path` | string | `DASHBOARD_BASE_PATH=/ccflare` |
@@ -229,9 +220,6 @@ Optimized for maximum request throughput with minimal overhead:
 ```json
 {
   "lb_strategy": "session",
-  "retry_attempts": 2,
-  "retry_delay_ms": 500,
-  "retry_backoff": 1.5,
   "session_duration_ms": 300000,
   "port": 8080
 }
@@ -240,8 +228,6 @@ Optimized for maximum request throughput with minimal overhead:
 Environment variables:
 ```bash
 export LB_STRATEGY=session
-export RETRY_ATTEMPTS=2
-export RETRY_DELAY_MS=500
 export SESSION_DURATION_MS=300000  # 5 minutes
 export LOG_LEVEL=WARN  # Reduce logging overhead
 ```
@@ -253,9 +239,6 @@ Ideal for maintaining conversation context with Claude:
 ```json
 {
   "lb_strategy": "session",
-  "retry_attempts": 3,
-  "retry_delay_ms": 1000,
-  "retry_backoff": 2,
   "session_duration_ms": 21600000,
   "port": 8080
 }
@@ -265,7 +248,6 @@ Environment variables:
 ```bash
 export LB_STRATEGY=session
 export SESSION_DURATION_MS=21600000  # 6 hours
-export RETRY_ATTEMPTS=3
 export LOG_LEVEL=INFO
 ```
 
@@ -276,9 +258,6 @@ Configuration for local development and debugging:
 ```json
 {
   "lb_strategy": "session",
-  "retry_attempts": 5,
-  "retry_delay_ms": 2000,
-  "retry_backoff": 2,
   "session_duration_ms": 3600000,
   "port": 3000
 }
@@ -290,7 +269,6 @@ export PORT=3000
 export LOG_LEVEL=DEBUG
 export LOG_FORMAT=pretty
 export ccflare_DEBUG=1
-export RETRY_ATTEMPTS=5
 ```
 
 ### Production Setup
@@ -300,9 +278,6 @@ Recommended configuration for production deployments:
 ```json
 {
   "lb_strategy": "session",
-  "retry_attempts": 3,
-  "retry_delay_ms": 1000,
-  "retry_backoff": 2,
   "session_duration_ms": 7200000,
   "port": 8080
 }

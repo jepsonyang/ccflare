@@ -190,16 +190,7 @@ export NO_PROXY=localhost,127.0.0.1
    - Ensure accounts aren't all rate-limited
    - Verify load balancing strategy is appropriate
 
-2. Optimize retry settings:
-   ```json
-   {
-     "retry_attempts": 2,
-     "retry_delay_ms": 500,
-     "retry_backoff": 1.5
-   }
-   ```
-
-3. Use session-based routing for conversational workloads:
+2. Use session-based routing for conversational workloads:
    ```bash
    # Set strategy to session for better performance with conversations
    # Session is the default and only supported strategy
@@ -308,8 +299,6 @@ Environment variables override config file settings:
 - `CLIENT_ID`: OAuth client ID
 - `PORT`: Server port (default: 8080)
 - `LB_STRATEGY`: Load balancing strategy
-- `RETRY_ATTEMPTS`: Number of retry attempts
-- `RETRY_DELAY_MS`: Initial retry delay
 - `SESSION_DURATION_MS`: Session duration for session strategy
 
 ## Database Issues
@@ -723,9 +712,6 @@ grep "\[Server\]" /tmp/ccflare-logs/app.log
 | `CLIENT_ID` | OAuth client ID for Anthropic | None | `my-oauth-client-id` |
 | `PORT` | Server port | 8080 | `3000` |
 | `LB_STRATEGY` | Load balancing strategy | `session` | Only `session` is supported |
-| `RETRY_ATTEMPTS` | Number of retry attempts | 3 | `5` |
-| `RETRY_DELAY_MS` | Initial retry delay in ms | 1000 | `500` |
-| `RETRY_BACKOFF` | Retry backoff multiplier | 2 | `1.5` |
 | `SESSION_DURATION_MS` | Session duration for session strategy | 3600000 (1 hour) | `1800000` |
 
 ### Paths and Storage

@@ -228,9 +228,6 @@ SESSION_DURATION_MS=18000000    # Session duration in ms (default: 5 hours)
 CLIENT_ID=<your-client-id>      # Custom OAuth client ID (optional)
 
 # Retry Configuration
-RETRY_ATTEMPTS=3                # Number of retry attempts (default: 3)
-RETRY_DELAY_MS=1000            # Initial retry delay in ms (default: 1000)
-RETRY_BACKOFF=2                # Exponential backoff multiplier (default: 2)
 
 # Development
 LOG_LEVEL=info                  # Logging level (debug|info|warn|error)

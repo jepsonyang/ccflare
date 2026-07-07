@@ -34,11 +34,6 @@ function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 			"client_id",
 			"9d1c250a-e61b-44d9-88ed-5944d1962f5e",
 		) as string,
-		retry: {
-			attempts: config.get("retry_attempts", 3) as number,
-			delayMs: config.get("retry_delay_ms", 1000) as number,
-			backoff: config.get("retry_backoff", 2) as number,
-		},
 		sessionDurationMs: config.get(
 			"session_duration_ms",
 			TIME_CONSTANTS.SESSION_DURATION_DEFAULT,

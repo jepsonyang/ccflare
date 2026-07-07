@@ -679,9 +679,6 @@ PORT=8080                      # Server port
 LB_STRATEGY=session           # Load balancing strategy
 
 # Retry Configuration
-RETRY_ATTEMPTS=3              # Number of retry attempts
-RETRY_DELAY_MS=1000          # Initial retry delay
-RETRY_BACKOFF=2              # Backoff multiplier
 SESSION_DURATION_MS=18000000 # Session duration (5 hours)
 ```
 

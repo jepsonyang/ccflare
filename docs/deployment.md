@@ -182,10 +182,7 @@ module.exports = {
       LOG_LEVEL: 'INFO',
       LOG_FORMAT: 'json',
       CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
-      SESSION_DURATION_MS: 18000000,
-      RETRY_ATTEMPTS: 3,
-      RETRY_DELAY_MS: 1000,
-      RETRY_BACKOFF: 2
+      SESSION_DURATION_MS: 18000000
     },
     error_file: '/opt/ccflare/data/logs/error.log',
     out_file: '/opt/ccflare/data/logs/out.log',
@@ -232,9 +229,6 @@ Environment="LOG_LEVEL=INFO"
 Environment="LOG_FORMAT=json"
 Environment="CLIENT_ID=9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 Environment="SESSION_DURATION_MS=18000000"
-Environment="RETRY_ATTEMPTS=3"
-Environment="RETRY_DELAY_MS=1000"
-Environment="RETRY_BACKOFF=2"
 
 # Security
 NoNewPrivileges=true
@@ -341,9 +335,6 @@ services:
       - LOG_FORMAT=json
       - CLIENT_ID=9d1c250a-e61b-44d9-88ed-5944d1962f5e
       - SESSION_DURATION_MS=18000000
-      - RETRY_ATTEMPTS=3
-      - RETRY_DELAY_MS=1000
-      - RETRY_BACKOFF=2
     volumes:
       - ./data:/data
       - ./config:/config
@@ -734,9 +725,6 @@ sysctl -p
 {
   "lb_strategy": "session",
   "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-  "retry_attempts": 3,
-  "retry_delay_ms": 1000,
-  "retry_backoff": 2,
   "session_duration_ms": 18000000,  // 5 hours
   "port": 8080
 }
@@ -1183,9 +1171,6 @@ find /backup/ccflare -name "*.tar.gz" -mtime +30 -delete
 |----------|---------|-------------|
 | `CLIENT_ID` | 9d1c250a-e61b-44d9-88ed-5944d1962f5e | OAuth client ID for authentication |
 | `SESSION_DURATION_MS` | 18000000 | Session duration in milliseconds (5 hours) |
-| `RETRY_ATTEMPTS` | 3 | Number of retry attempts for failed requests |
-| `RETRY_DELAY_MS` | 1000 | Initial delay between retries in milliseconds |
-| `RETRY_BACKOFF` | 2 | Backoff multiplier for exponential retry delays |
 | `ccflare_CONFIG_PATH` | Platform-specific | Path to configuration file |
 | `ccflare_DB_PATH` | Platform-specific | Path to SQLite database file |
 
@@ -1197,9 +1182,6 @@ ccflare also supports a JSON configuration file that takes precedence over envir
 {
   "lb_strategy": "session",
   "client_id": "your-client-id",
-  "retry_attempts": 5,
-  "retry_delay_ms": 2000,
-  "retry_backoff": 1.5,
   "session_duration_ms": 7200000,
   "port": 3000
 }

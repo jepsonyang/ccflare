@@ -20,7 +20,6 @@ const log = new Logger("Config");
 
 export interface RuntimeConfig {
 	clientId: string;
-	retry: { attempts: number; delayMs: number; backoff: number };
 	sessionDurationMs: number;
 	port: number;
 	dashboardBasePath: string;
@@ -29,9 +28,6 @@ export interface RuntimeConfig {
 export interface ConfigData {
 	lb_strategy?: StrategyName;
 	client_id?: string;
-	retry_attempts?: number;
-	retry_delay_ms?: number;
-	retry_backoff?: number;
 	session_duration_ms?: number;
 	port?: number;
 	dashboard_base_path?: string;
@@ -103,9 +99,6 @@ function sanitizeConfigData(value: unknown): ConfigData {
 	}
 
 	const numericKeys = [
-		"retry_attempts",
-		"retry_delay_ms",
-		"retry_backoff",
 		"session_duration_ms",
 		"port",
 		"data_retention_days",
@@ -337,11 +330,6 @@ export class Config extends EventEmitter {
 		// Default values
 		const defaults: RuntimeConfig = {
 			clientId: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-			retry: {
-				attempts: 3,
-				delayMs: TIME_CONSTANTS.RETRY_DELAY_DEFAULT,
-				backoff: 2,
-			},
 			sessionDurationMs: TIME_CONSTANTS.SESSION_DURATION_DEFAULT,
 			port: NETWORK.DEFAULT_PORT,
 			dashboardBasePath: "",
@@ -350,18 +338,6 @@ export class Config extends EventEmitter {
 		// Override with environment variables if present
 		if (process.env.CLIENT_ID) {
 			defaults.clientId = process.env.CLIENT_ID;
-		}
-		const retryAttempts = parseNumber(process.env.RETRY_ATTEMPTS);
-		if (retryAttempts !== undefined) {
-			defaults.retry.attempts = retryAttempts;
-		}
-		const retryDelayMs = parseNumber(process.env.RETRY_DELAY_MS);
-		if (retryDelayMs !== undefined) {
-			defaults.retry.delayMs = retryDelayMs;
-		}
-		const retryBackoff = parseNumber(process.env.RETRY_BACKOFF);
-		if (retryBackoff !== undefined) {
-			defaults.retry.backoff = retryBackoff;
 		}
 		const sessionDurationMs = parseNumber(process.env.SESSION_DURATION_MS);
 		if (sessionDurationMs !== undefined) {
@@ -380,15 +356,6 @@ export class Config extends EventEmitter {
 		// Override with config file settings if present
 		if (this.data.client_id) {
 			defaults.clientId = this.data.client_id;
-		}
-		if (typeof this.data.retry_attempts === "number") {
-			defaults.retry.attempts = this.data.retry_attempts;
-		}
-		if (typeof this.data.retry_delay_ms === "number") {
-			defaults.retry.delayMs = this.data.retry_delay_ms;
-		}
-		if (typeof this.data.retry_backoff === "number") {
-			defaults.retry.backoff = this.data.retry_backoff;
 		}
 		if (typeof this.data.session_duration_ms === "number") {
 			defaults.sessionDurationMs = this.data.session_duration_ms;

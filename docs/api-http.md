@@ -907,9 +907,6 @@ ccflare can be configured using the following environment variables:
 - `SESSION_DURATION_MS` - Session duration in milliseconds (default: 18000000 / 5 hours)
 - `CLIENT_ID` - OAuth client ID for Anthropic authentication (default: 9d1c250a-e61b-44d9-88ed-5944d1962f5e)
 - `CF_STREAM_BODY_MAX_BYTES` - Maximum bytes to capture from streaming responses (default: 262144 / 256KB)
-- `RETRY_ATTEMPTS` - Number of retry attempts for failed requests (default: 3)
-- `RETRY_DELAY_MS` - Initial delay between retries in milliseconds (default: 1000)
-- `RETRY_BACKOFF` - Exponential backoff multiplier for retries (default: 2)
 
 ### Configuration File
 
@@ -922,9 +919,6 @@ In addition to environment variables, ccflare supports configuration through a J
 {
   "lb_strategy": "session",
   "client_id": "your-oauth-client-id",
-  "retry_attempts": 3,
-  "retry_delay_ms": 1000,
-  "retry_backoff": 2,
   "session_duration_ms": 18000000,
   "port": 8080,
   "stream_body_max_bytes": 262144
