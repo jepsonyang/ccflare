@@ -3,17 +3,22 @@ import type { Account } from "@ccflare/types";
 import type { Provider, RateLimitInfo } from "./types";
 
 /**
- * Headers that are provider-neutral transport artifacts and should always be
- * removed before forwarding a request upstream.
+ * Headers that must never reach an upstream provider and are always removed
+ * before forwarding a request:
+ *   - provider-neutral transport artifacts (host, accept-encoding,
+ *     content-encoding), and
+ *   - ccflare-internal routing headers (x-ccflare-group) that ccflare consumes
+ *     for account-group selection and that carry no meaning upstream.
  */
 const TRANSPORT_HEADERS_TO_DELETE = [
 	"host",
 	"accept-encoding",
 	"content-encoding",
+	"x-ccflare-group",
 ] as const;
 
 /**
- * Remove provider-neutral transport headers from a Headers object.
+ * Remove transport and ccflare-internal headers from a Headers object.
  * Auth-specific headers (Authorization, x-api-key, anthropic-version, etc.)
  * are NOT touched here -- those belong to the concrete providers.
  */
